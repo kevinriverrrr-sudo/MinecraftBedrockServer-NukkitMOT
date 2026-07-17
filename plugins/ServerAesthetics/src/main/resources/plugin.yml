@@ -1,0 +1,33 @@
+name: ServerAesthetics
+main: com.server.aesthetics.ServerAestheticsPlugin
+version: "1.0.0"
+api: ["1.0.0"]
+author: ServerTeam
+description: Server aesthetics - scoreboard, tab, join effects
+depend: [CustomPerms]
+commands:
+  spawn:
+    description: Teleport to spawn
+  setspawn:
+    description: Set spawn point
+    permission: aesthetics.admin
+  serverinfo:
+    description: Server information
+    aliases: ["si"]
+  scoreboard:
+    description: Toggle scoreboard
+    permission: aesthetics.scoreboard.toggle
+  broadcast:
+    description: Broadcast message
+    usage: "/broadcast <message>"
+    permission: aesthetics.broadcast
+permissions:
+  aesthetics.admin:
+    description: Admin commands
+    default: op
+  aesthetics.scoreboard.toggle:
+    description: Toggle scoreboard visibility
+    default: true
+  aesthetics.broadcast:
+    description: Broadcast messages
+    default: op

@@ -1,0 +1,63 @@
+package cn.nukkit.network.protocol;
+
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
+import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse;
+import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@ToString
+@NoArgsConstructor
+public class ItemStackResponsePacket extends DataPacket {
+
+    public static final byte NETWORK_ID = ProtocolInfo.ITEM_STACK_RESPONSE_PACKET;
+
+    public final List<ItemStackResponse> entries = new ArrayList<>();
+
+    @Override
+    public void encode() {
+        this.reset();
+        putArray(entries, (r) -> {
+            putByte((byte) r.getResult().ordinal());
+            putVarInt(r.getRequestId());
+            if (r.getResult() != ItemStackResponseStatus.OK) return;
+            putArray(r.getContainers(), (container) -> {
+                if (this.protocol >= ProtocolInfo.v1_21_20) {
+                    writeFullContainerName(container.getContainerName() != null
+                            ? container.getContainerName()
+                            : new FullContainerName(container.getContainer(), null));
+                } else {
+                    putByte((byte) container.getContainer().getId(this.gameVersion));
+                }
+                putArray(container.getItems(), (item) -> {
+                    putByte((byte) item.getSlot());
+                    putByte((byte) item.getHotbarSlot());
+                    putByte((byte) item.getCount());
+                    putVarInt(item.getStackNetworkId());
+                    if (this.protocol >= ProtocolInfo.v1_16_200) {
+                        putString(item.getCustomName());
+                    }
+                    if (this.protocol >= ProtocolInfo.v1_21_50) {
+                        putString(item.getFilteredCustomName());
+                    }
+                    if (this.protocol >= ProtocolInfo.v1_16_210) {
+                        putVarInt(item.getDurabilityCorrection());
+                    }
+                });
+            });
+        });
+    }
+
+    @Override
+    public void decode() {
+        throw new UnsupportedOperationException();//client bound
+    }
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
+}

@@ -1,0 +1,129 @@
+# Auto-give starter kit on first join
+auto-kit-on-first-join: true
+first-join-kit: starter
+
+# Kits definition
+kits:
+  starter:
+    display-name: "§aStarter Kit"
+    description: "Basic items for new players"
+    permission: "kit.starter"
+    cooldown: 0  # No cooldown (one-time claim)
+    icon: "wooden_sword"
+    items:
+      - "wooden_sword:0:1 name:&aStarter_Sword lore:&7Given_to_new_players"
+      - "wooden_pickaxe:0:1"
+      - "wooden_axe:0:1"
+      - "cooked_beef:0:16"
+      - "torch:0:32"
+    armor:
+      helmet: "leather_helmet"
+      chestplate: "leather_chestplate"
+      leggings: "leather_leggings"
+      boots: "leather_boots"
+    effects: []
+
+  pvp:
+    display-name: "§cPvP Kit"
+    description: "Ready for battle!"
+    permission: "kit.pvp"
+    cooldown: 3600  # 1 hour
+    icon: "iron_sword"
+    items:
+      - "iron_sword:0:1 name:&cWarrior's_Blade"
+      - "bow:0:1 name:&cHunter's_Bow"
+      - "arrow:0:32"
+      - "golden_apple:0:3"
+      - "cooked_beef:0:16"
+    armor:
+      helmet: "iron_helmet"
+      chestplate: "iron_chestplate"
+      leggings: "iron_leggings"
+      boots: "iron_boots"
+    effects:
+      - "speed:1:10"  # effect:amplifier:duration_seconds
+
+  archer:
+    display-name: "§bArcher Kit"
+    description: "Sniper elite"
+    permission: "kit.archer"
+    cooldown: 3600
+    icon: "bow"
+    items:
+      - "bow:0:1 name:&bSniper_Bow lore:&7Deadly_accuracy"
+      - "arrow:0:64"
+      - "arrow:0:64"
+      - "golden_carrot:0:16"
+      - "cobweb:0:8"
+    armor:
+      helmet: "leather_helmet"
+      chestplate: "leather_chestplate"
+      leggings: "leather_leggings"
+      boots: "leather_boots"
+    effects:
+      - "speed:2:30"
+
+  vip:
+    display-name: "§aVIP Kit"
+    description: "Exclusive VIP items"
+    permission: "kit.vip"
+    cooldown: 86400  # 24 hours
+    icon: "diamond"
+    items:
+      - "diamond_sword:0:1 name:&aVIP_Blade lore:&6VIP_Exclusive"
+      - "diamond_pickaxe:0:1 name:&aVIP_Pickaxe lore:&6VIP_Exclusive"
+      - "golden_apple:0:8"
+      - "ender_pearl:0:4"
+      - "cooked_beef:0:32"
+    armor:
+      helmet: "diamond_helmet"
+      chestplate: "diamond_chestplate"
+      leggings: "diamond_leggings"
+      boots: "diamond_boots"
+    effects:
+      - "speed:1:60"
+      - "regeneration:1:30"
+
+  premium:
+    display-name: "§6Premium Kit"
+    description: "Ultimate Premium items"
+    permission: "kit.premium"
+    cooldown: 86400
+    icon: "nether_star"
+    items:
+      - "diamond_sword:0:1 name:&6Premium_Blade lore:&6Premium_Exclusive|&5Enchanted_with_power"
+      - "diamond_pickaxe:0:1 name:&6Premium_Pickaxe"
+      - "diamond_axe:0:1 name:&6Premium_Axe"
+      - "golden_apple:1:4"  # Enchanted golden apple
+      - "ender_pearl:0:16"
+      - "tnt:0:8"
+      - "cooked_beef:0:64"
+    armor:
+      helmet: "diamond_helmet"
+      chestplate: "diamond_chestplate"
+      leggings: "diamond_leggings"
+      boots: "diamond_boots"
+    effects:
+      - "speed:2:120"
+      - "regeneration:2:60"
+      - "damage_resistance:1:60"
+
+# Custom items
+custom-items:
+  special_sword:
+    material: "diamond_sword"
+    name: "§dVoid Blade"
+    lore:
+      - "§5Forged in the void"
+      - "§7Special Ability: Void Strike"
+    enchantments:
+      - "sharpness:5"
+      - "fire_aspect:2"
+      - "unbreaking:3"
+  healing_stick:
+    material: "stick"
+    name: "§aHealing Wand"
+    lore:
+      - "§2Right-click to heal"
+      - "§7Cooldown: 30s"
+    enchantments: []

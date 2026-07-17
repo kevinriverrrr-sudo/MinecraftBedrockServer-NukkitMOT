@@ -1,0 +1,28 @@
+name: PvPSystem
+main: com.server.pvp.PvPSystemPlugin
+version: "1.0.0"
+api: ["1.0.0"]
+author: ServerTeam
+description: Custom PvP system with combos, killstreaks, arenas, ELO
+depend: [CustomPerms]
+commands:
+  pvp:
+    description: PvP arena commands
+    usage: "/pvp <arena|join|leave|spectate>"
+    permission: pvp.use
+  pvpstats:
+    description: View PvP stats
+    usage: "/pvpstats [player]"
+  pvpleaderboard:
+    description: PvP leaderboard
+    usage: "/pvpleaderboard <kills|kd|elo>"
+permissions:
+  pvp.use:
+    description: Use PvP commands
+    default: true
+  pvp.admin:
+    description: Admin PvP commands
+    default: op
+  pvp.arena.create:
+    description: Create arenas
+    default: op

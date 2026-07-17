@@ -1,0 +1,194 @@
+/*
+ * https://PowerNukkit.org - The Nukkit you know but Powerful!
+ * Copyright (C) 2020  José Roberto de Araújo Júnior
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package cn.nukkit.inventory;
+
+import cn.nukkit.Player;
+import cn.nukkit.Server;
+import cn.nukkit.item.*;
+import cn.nukkit.item.trim.ItemTrimMaterialType;
+import cn.nukkit.level.Position;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
+import javax.annotation.Nullable;
+import java.util.Arrays;
+
+/**
+ * @author joserobjr
+ * @since 2020-09-28
+ */
+public class SmithingInventory extends FakeBlockUIComponent {
+    private static final int EQUIPMENT = 0;
+    private static final int INGREDIENT = 1;
+    private static final int TEMPLATE = 2;
+
+    public static final int SMITHING_EQUIPMENT_UI_SLOT = 51;
+    public static final int SMITHING_INGREDIENT_UI_SLOT = 52;
+    public static final int SMITHING_TEMPLATE_UI_SLOT = 53;
+
+    private Item currentResult = Item.get(0);
+
+    public SmithingInventory(PlayerUIInventory playerUI, Position position) {
+        super(playerUI, InventoryType.SMITHING_TABLE, 51, position);
+    }
+
+    @Nullable
+    public SmithingRecipe matchRecipe() {
+        return Server.getInstance().getCraftingManager().matchSmithingRecipe(ProtocolInfo.CURRENT_PROTOCOL, Arrays.asList(getEquipment(), getIngredient(), getTemplate()));
+    }
+
+    @Override
+    public void onSlotChange(int index, Item before, boolean send) {
+        if (index == EQUIPMENT || index == INGREDIENT || index == TEMPLATE) {
+            updateResult();
+        }
+        super.onSlotChange(index, before, send);
+    }
+
+    public void updateResult() {
+        setResult(this.getResult());
+    }
+
+    private void setResult(Item result) {
+        this.currentResult = result;
+    }
+
+    public Item getResult() {
+        Item trimOutPutItem = this.getTrimOutPutItem();
+        if (!trimOutPutItem.isNull()) {
+            return trimOutPutItem;
+        }
+        SmithingRecipe recipe = matchRecipe();
+        if (recipe == null) {
+            return Item.AIR_ITEM.clone();
+        }
+        return recipe.getFinalResult(getEquipment(), getTemplate());
+    }
+
+    public Item getTemplate() {
+        return getItem(TEMPLATE);
+    }
+
+    public void setTemplate(Item template) {
+        setItem(TEMPLATE, template);
+    }
+
+    public Item getEquipment() {
+        return getItem(EQUIPMENT);
+    }
+
+    public void setEquipment(Item equipment) {
+        setItem(EQUIPMENT, equipment);
+    }
+
+    public Item getIngredient() {
+        return getItem(INGREDIENT);
+    }
+
+    public void setIngredient(Item ingredient) {
+        setItem(INGREDIENT, ingredient);
+    }
+
+    @Override
+    public void onOpen(Player who) {
+        super.onOpen(who);
+        who.craftingType = Player.SMITHING_WINDOW_ID;
+    }
+
+    @Override
+    public void onClose(Player who) {
+        super.onClose(who);
+        who.craftingType = Player.CRAFTING_SMALL;
+
+        who.giveItem(getItem(EQUIPMENT), getItem(INGREDIENT), getItem(TEMPLATE));
+
+        this.clear(EQUIPMENT);
+        this.clear(INGREDIENT);
+        this.clear(TEMPLATE);
+        this.getHolder().getInventory().clear(CREATED_ITEM_OUTPUT_UI_SLOT);
+    }
+
+    public Item getCurrentResult() {
+        return currentResult;
+    }
+
+    public Item getTrimOutPutItem() {
+        Item input = this.getEquipment().clone();
+        ItemTrimMaterialType material = resolveTrimMaterial(this.getIngredient());
+        if (material != null && this.getTemplate() instanceof ItemTrimPattern) {
+            if (isTrimmableArmor(input)) {
+                ItemArmor trimmedArmor = (ItemArmor) input.clone();
+                ItemTrimPattern pattern = (ItemTrimPattern) this.getTemplate();
+                return trimmedArmor.setArmorTrim(pattern.getPattern(), material);
+            }
+        }
+        return Item.AIR_ITEM.clone();
+    }
+
+    @Nullable
+    private ItemTrimMaterialType resolveTrimMaterial(Item item) {
+        if (item instanceof ItemTrimMaterial trimMaterial) {
+            return trimMaterial.getMaterial();
+        }
+
+        if (item.getId() == Item.DYE && item.getDamage() == ItemDye.LAPIS_LAZULI) {
+            return ItemTrimMaterialType.MATERIAL_LAPIS;
+        }
+
+        return null;
+    }
+
+    static boolean isTrimmableArmor(Item item) {
+        return item instanceof ItemArmor
+                && item.isArmor()
+                && (item.isHelmet() || item.isChestplate() || item.isLeggings() || item.isBoots());
+    }
+
+    @Override
+    public boolean allowedToAdd(Item item) {
+        if (item.isNull()) {
+            return true;
+        }
+
+        if (isTrimmableArmor(item)) {
+            return true;
+        }
+
+        if (item instanceof ItemTool && item.getTier() == ItemTool.TIER_DIAMOND) {
+            return true;
+        }
+
+        // Diamond horse armor and nautilus armor are not ItemTool; allow them
+        // into the equipment slot explicitly for the netherite upgrade.
+        String namespaceId = item.getNamespaceId();
+        if ("minecraft:diamond_horse_armor".equals(namespaceId)
+                || Item.DIAMOND_NAUTILUS_ARMOR.equals(namespaceId)) {
+            return true;
+        }
+
+        if (resolveTrimMaterial(item) != null) {
+            return true;
+        }
+
+        if (item instanceof ItemTrimPattern) {
+            return true;
+        }
+
+        return Item.NETHERITE_UPGRADE_SMITHING_TEMPLATE.equals(item.getNamespaceId());
+    }
+}

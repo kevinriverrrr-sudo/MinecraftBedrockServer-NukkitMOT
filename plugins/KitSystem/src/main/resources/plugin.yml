@@ -1,0 +1,38 @@
+name: KitSystem
+main: com.server.kitsystem.KitSystemPlugin
+version: "1.0.0"
+api: ["1.0.0"]
+author: ServerTeam
+description: Custom kit system with cooldowns and custom items
+depend: [CustomPerms]
+commands:
+  kit:
+    description: Kit commands
+    usage: "/kit <list|preview|<name>>"
+  kitadmin:
+    description: Kit admin commands
+    usage: "/kitadmin <create|delete|setcooldown|setpermission|give>"
+    permission: kit.admin
+  customitem:
+    description: Custom item commands
+    usage: "/customitem <give|list>"
+    permission: kit.admin
+permissions:
+  kit.admin:
+    description: Admin kit management
+    default: op
+  kit.starter:
+    description: Access to starter kit
+    default: true
+  kit.vip:
+    description: Access to VIP kit
+    default: false
+  kit.premium:
+    description: Access to Premium kit
+    default: false
+  kit.pvp:
+    description: Access to PvP kit
+    default: true
+  kit.archer:
+    description: Access to Archer kit
+    default: true

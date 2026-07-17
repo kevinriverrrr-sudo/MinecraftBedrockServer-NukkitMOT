@@ -1,0 +1,80 @@
+# Chat format per group (uses {prefix}, {suffix}, {player}, {message}, {nick})
+formats:
+  default: "§7{prefix}§7{player}§7 » §f{message}"
+  vip: "§a{prefix}§a{player}§a » §f{message}"
+  premium: "§6{prefix}§6{player}§6 » §f{message}"
+  admin: "§c{prefix}§c{player}§c » §f{message}"
+
+# Channels
+channels:
+  global:
+    format: "{group_format}"
+    permission: ""
+    radius: -1  # -1 = unlimited
+  local:
+    format: "§e[Local] {group_format}"
+    permission: ""
+    radius: 50
+  staff:
+    format: "§b[Staff] §b{player} §7» §b{message}"
+    permission: "chat.staff"
+    radius: -1
+  trade:
+    format: "§a[Trade] {group_format}"
+    permission: ""
+    radius: -1
+    cooldown: 30
+
+# Anti-spam
+anti-spam:
+  enabled: true
+  # Min seconds between messages
+  cooldown: 2
+  # Max identical messages in a row
+  max-duplicate: 3
+  # Max caps percentage (0-100)
+  max-caps: 70
+  # Max messages in 10 seconds
+  max-messages-per-10s: 8
+
+# Chat filter
+filter:
+  enabled: true
+  # Blocked words (case-insensitive)
+  blocked-words:
+    - "fuck"
+    - "shit"
+    - "bitch"
+    - "asshole"
+    - "dick"
+    - "nigger"
+    - "nigga"
+  # Replacement character
+  replacement: "*"
+  # Anti-advertising
+  anti-ad:
+    enabled: true
+    # Regex patterns for IPs and domains
+    block-ips: true
+    block-domains: true
+
+# Private messaging
+private-message:
+  format-sender: "§7[§fYou §7→ §f{receiver}§7] §f{message}"
+  format-receiver: "§7[§f{sender} §7→ §fYou§7] §f{message}"
+
+# Nickname settings
+nickname:
+  max-length: 16
+  min-length: 3
+  allow-colors: true
+  blocked-names:
+    - "Admin"
+    - "Moderator"
+    - "Owner"
+
+# Mention settings
+mentions:
+  enabled: true
+  format: "§e@{player}"
+  sound: "random.orb"

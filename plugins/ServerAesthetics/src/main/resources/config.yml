@@ -1,0 +1,89 @@
+# Server name
+server-name: "§6§lMinecraft §r§eBedrock §7Server"
+
+# Scoreboard settings
+scoreboard:
+  enabled: true
+  update-interval: 20  # ticks (1 second)
+  title-animation: true
+  title-frames:
+    - "§6§lSERVER"
+    - "§e§lS§6§lERVER"
+    - "§6§lS§e§lE§6§lRVER"
+    - "§6§lSE§e§lR§6§lVER"
+    - "§6§lSER§e§lV§6§lER"
+    - "§6§lSERV§e§lE§6§lR"
+    - "§6§lSERVE§e§lR"
+    - "§e§lSERVER"
+    - "§6§lSERVER"
+  lines:
+    - "§7§m                    "
+    - "§ePlayer: §f{player}"
+    - "§eRank: {prefix}"
+    - "§eOnline: §f{online}/{max}"
+    - "§7§m                    "
+    - "§ePing: §f{ping}ms"
+    - "§eTPS: {tps}"
+    - "§7§m                    "
+    - "§6play.example.com"
+
+# Tab list settings
+tab:
+  enabled: true
+  header-animation: true
+  header-frames:
+    - "§6§lMinecraft Bedrock§r\n§7Welcome!"
+    - "§e§lM§6§linecraft Bedrock§r\n§7Welcome!"
+    - "§6§lM§e§li§6§lnecraft Bedrock§r\n§7Welcome!"
+  footer: "§7Online: §f{online}/{max} §7| §7TPS: {tps}\n§6play.example.com"
+  update-interval: 40  # ticks
+  # Sort by rank priority (higher priority = top)
+  sort-by-rank: true
+
+# Join/Quit settings
+join:
+  message: "§e{prefix}§e{player} §7joined the game"
+  first-join-message: "§6§l★ §e{player} §7joined for the first time! §6§l★"
+  title: "§6Welcome!"
+  subtitle: "§e{player}, enjoy your stay!"
+  title-duration: 40  # ticks
+  action-bar: "§eWelcome back, {player}!"
+  sound: "random.levelup"
+  # Firework on first join
+  first-join-firework: true
+quit:
+  message: "§7{prefix}§7{player} §7left the game"
+
+# Spawn settings
+spawn:
+  # World name, x, y, z, yaw, pitch
+  location: "world,0,64,0,0,0"
+  # Teleport on first join
+  teleport-on-first-join: true
+  # Spawn protection radius
+  protection-radius: 30
+
+# Auto-broadcast
+broadcast:
+  enabled: true
+  interval: 120  # seconds
+  prefix: "§6§l[!] §r"
+  messages:
+    - "§eVisit our store at §6store.example.com"
+    - "§eUse §6/kit §eto get your starter items!"
+    - "§eJoin a dungeon with §6/dungeon enter§e!"
+    - "§eSupport the server at §6donate.example.com"
+    - "§eReport bugs at §6discord.example.com"
+    - "§eCheck your stats with §6/pvpstats"
+
+# Server info command
+serverinfo:
+  lines:
+    - "§6§l━━━ Server Info ━━━"
+    - "§eServer: §fMinecraft Bedrock"
+    - "§eCore: §fNukkit-MOT"
+    - "§eOnline: §f{online}/{max}"
+    - "§eTPS: {tps}"
+    - "§eUptime: {uptime}"
+    - "§eIP: §fplay.example.com:19132"
+    - "§6§l━━━━━━━━━━━━━━━━"

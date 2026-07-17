@@ -1,0 +1,111 @@
+# Donation ranks
+ranks:
+  vip:
+    display-name: "§aVIP"
+    prefix: "§a[VIP] "
+    priority: 10
+    duration: 2592000  # 30 days in seconds (0 = permanent)
+    permissions:
+      - donate.perk.fly
+      - donate.perk.hat
+      - donate.perk.workbench
+      - kit.vip
+      - chat.color
+      - chat.bold
+    perks:
+      max-homes: 2
+      fly: true
+      hat: true
+      workbench: true
+    price-display: "5.00 USD"
+
+  premium:
+    display-name: "§6Premium"
+    prefix: "§6[Premium] "
+    priority: 20
+    duration: 2592000
+    permissions:
+      - donate.perk.fly
+      - donate.perk.heal
+      - donate.perk.feed
+      - donate.perk.hat
+      - donate.perk.workbench
+      - donate.perk.enderchest
+      - donate.perk.back
+      - kit.premium
+      - chat.color
+      - chat.bold
+      - chat.italic
+    perks:
+      max-homes: 3
+      fly: true
+      heal: true
+      feed: true
+      hat: true
+      workbench: true
+      enderchest: true
+      back: true
+    price-display: "10.00 USD"
+
+  elite:
+    display-name: "§bElite"
+    prefix: "§b[Elite] "
+    priority: 30
+    duration: 0  # permanent
+    permissions:
+      - donate.perk.fly
+      - donate.perk.heal
+      - donate.perk.feed
+      - donate.perk.repair
+      - donate.perk.hat
+      - donate.perk.workbench
+      - donate.perk.enderchest
+      - donate.perk.back
+      - kit.elite
+      - chat.color
+      - chat.bold
+      - chat.italic
+    perks:
+      max-homes: 5
+      fly: true
+      heal: true
+      feed: true
+      repair: true
+      hat: true
+      workbench: true
+      enderchest: true
+      back: true
+    price-display: "20.00 USD"
+
+  legend:
+    display-name: "§dLegend"
+    prefix: "§d[Legend] "
+    priority: 40
+    duration: 0  # permanent
+    permissions:
+      - donate.perk.*
+      - kit.legend
+      - chat.color
+      - chat.bold
+      - chat.italic
+      - chat.nick
+    perks:
+      max-homes: 10
+      fly: true
+      heal: true
+      feed: true
+      repair: true
+      hat: true
+      workbench: true
+      enderchest: true
+      back: true
+      nick: true
+    price-display: "50.00 USD"
+
+# Expiry checker interval (seconds)
+expiry-check-interval: 3600
+
+# Code settings
+codes:
+  length: 8
+  characters: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

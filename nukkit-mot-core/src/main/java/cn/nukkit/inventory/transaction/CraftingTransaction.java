@@ -1,0 +1,226 @@
+package cn.nukkit.inventory.transaction;
+
+import cn.nukkit.Player;
+import cn.nukkit.Server;
+import cn.nukkit.event.inventory.CraftItemEvent;
+import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.transaction.action.CraftingTakeResultAction;
+import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
+import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.ContainerClosePacket;
+import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
+import cn.nukkit.plugin.InternalPlugin;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * @author CreeperFace
+ */
+public class CraftingTransaction extends InventoryTransaction {
+
+    protected int gridSize;
+
+    protected List<Item> inputs;
+
+    protected List<Item> secondaryOutputs;
+
+    protected Item primaryOutput;
+
+    protected CraftingRecipe recipe;
+
+    private Recipe transactionRecipe;
+
+    protected int craftingType;
+
+    public CraftingTransaction(Player source, List<InventoryAction> actions) {
+        super(source, actions, false);
+
+        this.craftingType = source.craftingType;
+        this.gridSize = (source.getCraftingGrid() instanceof BigCraftingGrid) ? 3 : 2;
+        this.inputs = new ArrayList<>();
+        this.secondaryOutputs = new ArrayList<>();
+
+        init(source, actions);
+    }
+
+    public void setInput(Item item) {
+        if (inputs.size() < gridSize * gridSize) {
+            for (Item existingInput : this.inputs) {
+                if (existingInput.equals(item, item.hasMeta(), item.hasCompoundTag())) {
+                    existingInput.setCount(existingInput.getCount() + item.getCount());
+                    return;
+                }
+            }
+            inputs.add(item.clone());
+        } else {
+            throw new RuntimeException("Input list is full can't add " + item);
+        }
+    }
+
+    public List<Item> getInputList() {
+        return inputs;
+    }
+
+    public void setExtraOutput(Item item) {
+        if (secondaryOutputs.size() < gridSize * gridSize) {
+            secondaryOutputs.add(item.clone());
+        } else {
+            throw new RuntimeException("Output list is full can't add " + item);
+        }
+    }
+
+    public Item getPrimaryOutput() {
+        return primaryOutput;
+    }
+
+    public void setPrimaryOutput(Item item) {
+        if (primaryOutput == null) {
+            primaryOutput = item.clone();
+        } else if (!primaryOutput.equals(item)) {
+            throw new RuntimeException("Primary result item has already been set and does not match the current item (expected " + primaryOutput + ", got " + item + ')');
+        }
+    }
+
+    public CraftingRecipe getRecipe() {
+        return recipe;
+    }
+
+    public Recipe getTransactionRecipe() {
+        return this.transactionRecipe;
+    }
+
+    protected void setTransactionRecipe(Recipe recipe) {
+        this.transactionRecipe = recipe;
+        this.recipe = recipe instanceof CraftingRecipe ? (CraftingRecipe) recipe : null;
+    }
+
+    @Override
+    public boolean canExecute() {
+        Recipe recipe;
+        recipe = source.getServer().getCraftingManager().matchRecipe(this.inputs, this.primaryOutput, this.secondaryOutputs);
+        if (recipe == null) {
+            MultiRecipe multiRecipe = source.getServer().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
+            if (multiRecipe != null) {
+                recipe = multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList());
+                // Multi-recipe output is rebuilt authoritatively by the server, overriding the client NBT (#798).
+                applyAuthoritativeOutput(recipe.getResult());
+            }
+        }
+        this.setTransactionRecipe(recipe);
+        return this.getTransactionRecipe() != null && super.canExecute();
+    }
+
+    /**
+     * Replaces the client-authored output with the server-rebuilt one, covering primaryOutput,
+     * CraftingTakeResultAction source and the inventory SlotChangeAction target, so that the
+     * authoritative NBT lands in the player's inventory.
+     */
+    void applyAuthoritativeOutput(Item authoritativeOutput) {
+        if (authoritativeOutput == null || authoritativeOutput.equalsExact(this.primaryOutput)) {
+            return;
+        }
+
+        this.primaryOutput = authoritativeOutput.clone();
+
+        for (InventoryAction action : this.actions) {
+            if (action instanceof CraftingTakeResultAction resultAction) {
+                resultAction.setSourceItem(authoritativeOutput.clone());
+            } else if (action instanceof SlotChangeAction slotChangeAction) {
+                if (slotChangeAction.getSourceItem().isNull()
+                        && slotChangeAction.getTargetItem().getId() == authoritativeOutput.getId()
+                        && slotChangeAction.getTargetItem().getCount() > 0) {
+                    slotChangeAction.setTargetItem(authoritativeOutput.clone());
+                }
+            }
+        }
+    }
+
+    @Override
+    protected boolean callExecuteEvent() {
+        CraftItemEvent ev;
+
+        this.source.getServer().getPluginManager().callEvent(ev = new CraftItemEvent(this));
+        return !ev.isCancelled();
+    }
+
+    @Override
+    protected void sendInventories() {
+        super.sendInventories();
+
+        if (source.craftingType == Player.CRAFTING_SMALL) {
+            return; // Already closed
+        }
+
+        /*
+         * TODO: HACK!
+         * we can't resend the contents of the crafting window, so we force the client to close it instead.
+         * So people don't whine about messy desync issues when someone cancels CraftItemEvent, or when a crafting
+         * transaction goes wrong.
+         */
+        source.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
+            if (source.isOnline() && source.isAlive()) {
+                ContainerClosePacket pk = new ContainerClosePacket();
+                pk.windowId = ContainerIds.NONE;
+                pk.wasServerInitiated = true;
+                pk.type = ContainerType.NONE;
+                source.dataPacket(pk);
+            }
+        }, 10);
+
+        this.source.resetCraftingGridType();
+    }
+
+    @Override
+    public boolean execute() {
+        if (super.execute()) {
+            switch (this.primaryOutput.getId()) {
+                case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
+                case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
+                case Item.FURNACE -> source.awardAchievement("buildFurnace");
+                case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
+                case Item.BREAD -> source.awardAchievement("makeBread");
+                case Item.CAKE -> source.awardAchievement("bakeCake");
+                case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
+                    Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
+                case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
+                case Item.DIAMOND -> source.awardAchievement("diamond");
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean checkForItemPart(List<InventoryAction> actions) {
+        for (InventoryAction action : actions) {
+            if (action instanceof SlotChangeAction slotChangeAction) {
+                if (slotChangeAction.getInventory().getType() == InventoryType.UI) {
+                    if (slotChangeAction.getSlot() == 50) {
+                        if (!slotChangeAction.getSourceItem().equals(slotChangeAction.getTargetItem())) {
+                            return true;
+                        } else {
+                            Server.getInstance().getLogger().debug("Source equals target");
+                            return false;
+                        }
+                    } else {
+                        Server.getInstance().getLogger().debug("Invalid slot: " + slotChangeAction.getSlot());
+                        return false;
+                    }
+                } else {
+                    Server.getInstance().getLogger().debug("Invalid action type: " + slotChangeAction.getInventory().getType());
+                    return false;
+                }
+            } else {
+                Server.getInstance().getLogger().debug("SlotChangeAction expected, got " + action);
+                return false;
+            }
+        }
+        Server.getInstance().getLogger().debug("No actions on the list");
+        return false;
+    }
+}

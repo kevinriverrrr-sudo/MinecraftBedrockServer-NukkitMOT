@@ -1,0 +1,163 @@
+package cn.nukkit.network.protocol.types.inventory;
+
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
+
+public enum ContainerSlotType {
+
+    ANVIL_INPUT(0),
+    ANVIL_MATERIAL(1),
+    ANVIL_RESULT(2),
+    SMITHING_TABLE_INPUT(3),
+    SMITHING_TABLE_MATERIAL(4),
+    SMITHING_TABLE_RESULT(5),
+    ARMOR(6),
+    LEVEL_ENTITY(7),
+    BEACON_PAYMENT(8),
+    BREWING_INPUT(9),
+    BREWING_RESULT(10),
+    BREWING_FUEL(11),
+    HOTBAR_AND_INVENTORY(12),
+    CRAFTING_INPUT(13),
+    CRAFTING_OUTPUT(14),
+    RECIPE_CONSTRUCTION(15),
+    RECIPE_NATURE(16),
+    RECIPE_ITEMS(17),
+    RECIPE_SEARCH(18),
+    RECIPE_SEARCH_BAR(19),
+    RECIPE_EQUIPMENT(20),
+    RECIPE_BOOK(21),
+    ENCHANTING_INPUT(22),
+    ENCHANTING_MATERIAL(23),
+    FURNACE_FUEL(24),
+    FURNACE_INGREDIENT(25),
+    FURNACE_RESULT(26),
+    HORSE_EQUIP(27),
+    HOTBAR(28),
+    INVENTORY(29),
+    SHULKER_BOX(30),
+    TRADE_INGREDIENT_1(31),
+    TRADE_INGREDIENT_2(32),
+    TRADE_RESULT(33),
+    OFFHAND(34),
+    COMPOUND_CREATOR_INPUT(35),
+    COMPOUND_CREATOR_OUTPUT(36),
+    ELEMENT_CONSTRUCTOR_OUTPUT(37),
+    MATERIAL_REDUCER_INPUT(38),
+    MATERIAL_REDUCER_OUTPUT(39),
+    LAB_TABLE_INPUT(40),
+    LOOM_INPUT(41),
+    LOOM_DYE(42),
+    LOOM_MATERIAL(43),
+    LOOM_RESULT(44),
+    BLAST_FURNACE_INGREDIENT(45),
+    SMOKER_INGREDIENT(46),
+    TRADE2_INGREDIENT_1(47),
+    TRADE2_INGREDIENT_2(48),
+    TRADE2_RESULT(49),
+    GRINDSTONE_INPUT(50),
+    GRINDSTONE_ADDITIONAL(51),
+    GRINDSTONE_RESULT(52),
+    STONECUTTER_INPUT(53),
+    STONECUTTER_RESULT(54),
+    CARTOGRAPHY_INPUT(55),
+    CARTOGRAPHY_ADDITIONAL(56),
+    CARTOGRAPHY_RESULT(57),
+    BARREL(58),
+    CURSOR(59),
+    CREATED_OUTPUT(60),
+    SMITHING_TABLE_TEMPLATE(61),
+    /**
+     * @since v630
+     */
+    CRAFTER_BLOCK_CONTAINER(62),
+    /**
+     * @since v712
+     */
+    DYNAMIC_CONTAINER(63);
+
+    private final int id;
+    private static final Int2ObjectArrayMap<ContainerSlotType> VALUES = new Int2ObjectArrayMap<>();
+
+    static {
+        for (var v : values()) {
+            VALUES.put(v.getId(), v);
+        }
+    }
+
+    ContainerSlotType(int id) {
+        this.id = id;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public int getId(GameVersion gameVersion) {
+        // 网易客户端在标准枚举索引 17 (RECIPE_ITEMS) 处插入了一个额外的
+        // RECIPE_CUSTOM 枚举值，因此所有标准索引 >= 17 的槽位类型在线路上都需要 +1。
+        if (gameVersion.isNetEase() && this.id >= RECIPE_ITEMS.id) {
+            return this.id + 1;
+        }
+        int protocol = gameVersion.getProtocol();
+        if (protocol >= ProtocolInfo.v1_21_20) {
+            return this.id;
+        }
+        if (protocol >= ProtocolInfo.v1_20_50) {
+            if (this == DYNAMIC_CONTAINER) {
+                throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+            }
+            return this.id;
+        }
+        if (protocol >= ProtocolInfo.v1_19_80) {
+            if (this == CRAFTER_BLOCK_CONTAINER || this == DYNAMIC_CONTAINER) {
+                throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+            }
+            return this.id;
+        }
+        if (protocol >= ProtocolInfo.v1_19_50) {
+            if (this == SMITHING_TABLE_TEMPLATE || this == CRAFTER_BLOCK_CONTAINER || this == DYNAMIC_CONTAINER) {
+                throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+            }
+            return this.id;
+        }
+        if (this == RECIPE_BOOK || this == SMITHING_TABLE_TEMPLATE || this == CRAFTER_BLOCK_CONTAINER || this == DYNAMIC_CONTAINER) {
+            throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+        }
+        return this.id >= RECIPE_BOOK.id ? this.id - 1 : this.id;
+    }
+
+    public static ContainerSlotType fromId(int id) {
+        return VALUES.get(id);
+    }
+
+    public static ContainerSlotType fromId(int id, GameVersion gameVersion) {
+        // 网易客户端在线路索引 17 处发送 RECIPE_CUSTOM（标准枚举不存在该值，按未知处理），
+        // 且所有标准索引 >= 17 的槽位类型在线路上都比标准多 1，因此 id >= 18 需 -1 还原。
+        if (gameVersion.isNetEase()) {
+            if (id == RECIPE_ITEMS.id) {
+                // Wire byte 17 is the NetEase-only RECIPE_CUSTOM.
+                return null;
+            }
+            return fromId(id > RECIPE_ITEMS.id ? id - 1 : id);
+        }
+        int protocol = gameVersion.getProtocol();
+        if (protocol >= ProtocolInfo.v1_21_20) {
+            return fromId(id);
+        }
+        if (protocol >= ProtocolInfo.v1_20_50) {
+            return id == DYNAMIC_CONTAINER.id ? null : fromId(id);
+        }
+        if (protocol >= ProtocolInfo.v1_19_80) {
+            return id >= CRAFTER_BLOCK_CONTAINER.id ? null : fromId(id);
+        }
+        if (protocol >= ProtocolInfo.v1_19_50) {
+            return id >= SMITHING_TABLE_TEMPLATE.id ? null : fromId(id);
+        }
+        if (id < 0 || id > CREATED_OUTPUT.id - 1) {
+            return null;
+        }
+        return fromId(id >= RECIPE_BOOK.id ? id + 1 : id);
+    }
+}

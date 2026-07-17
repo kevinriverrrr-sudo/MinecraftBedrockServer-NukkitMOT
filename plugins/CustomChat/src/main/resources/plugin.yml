@@ -1,0 +1,47 @@
+name: CustomChat
+main: com.server.customchat.CustomChatPlugin
+version: "1.0.0"
+api: ["1.0.0"]
+author: ServerTeam
+description: Custom chat system with ranks, channels, and donation perks
+depend: [CustomPerms]
+commands:
+  msg:
+    description: Send private message
+    usage: "/msg <player> <message>"
+  reply:
+    description: Reply to last message
+    usage: "/reply <message>"
+    aliases: ["r"]
+  ignore:
+    description: Ignore a player
+    usage: "/ignore <player>"
+  channel:
+    description: Switch chat channel
+    usage: "/channel <global|local|staff|trade>"
+    aliases: ["ch"]
+  nick:
+    description: Set nickname
+    usage: "/nick <set|reset> [name]"
+permissions:
+  chat.color:
+    description: Use color codes in chat
+    default: op
+  chat.bold:
+    description: Use bold in chat
+    default: op
+  chat.italic:
+    description: Use italic in chat
+    default: op
+  chat.nick:
+    description: Set nickname
+    default: op
+  chat.staff:
+    description: Use staff channel
+    default: op
+  chat.bypass.spam:
+    description: Bypass spam filter
+    default: op
+  chat.bypass.filter:
+    description: Bypass profanity filter
+    default: op

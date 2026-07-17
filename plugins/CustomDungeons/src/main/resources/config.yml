@@ -1,0 +1,215 @@
+# Dungeon settings
+settings:
+  cooldown: 3600  # 1 hour between runs per player
+  max-party-size: 4
+  respawn-in-dungeon: true
+  completion-broadcast: true
+
+dungeons:
+  undead_crypt:
+    display-name: "§8Undead Crypt"
+    difficulty: "Easy"
+    min-level: 1
+    max-players: 4
+    cooldown: 1800
+    entry-fee: ""
+    spawn-position: "0,64,0,world"  # x,y,z,level
+    waves:
+      - mobs:
+          - type: "zombie"
+            name: "§8Crypt Zombie"
+            health: 30
+            damage: 5
+            count: 5
+        delay: 5
+      - mobs:
+          - type: "skeleton"
+            name: "§8Crypt Archer"
+            health: 25
+            damage: 7
+            count: 3
+          - type: "zombie"
+            name: "§8Crypt Brute"
+            health: 50
+            damage: 8
+            count: 2
+        delay: 5
+    boss:
+      type: "wither_skeleton"
+      name: "§4§lCrypt Lord"
+      health: 200
+      damage: 15
+      abilities:
+        - "summon:zombie:3:Crypt Minion"
+        - "lightning"
+      phases:
+        - health-percentage: 50
+          message: "§4The Crypt Lord enrages!"
+          damage-multiplier: 1.5
+        - health-percentage: 25
+          message: "§cThe Crypt Lord enters berserk mode!"
+          damage-multiplier: 2.0
+          summon: "zombie:5:Berserk Minion"
+    loot:
+      guaranteed:
+        - "iron_ingot:0:5"
+        - "gold_ingot:0:3"
+        - "emerald:0:2"
+      random:
+        - item: "diamond:0:1"
+          chance: 30
+        - item: "iron_sword:0:1"
+          chance: 50
+        - item: "golden_apple:0:1"
+          chance: 20
+        - item: "enchanted_book:0:1"
+          chance: 10
+
+  fire_temple:
+    display-name: "§6Fire Temple"
+    difficulty: "Medium"
+    min-level: 10
+    max-players: 4
+    cooldown: 3600
+    spawn-position: "100,64,0,world"
+    waves:
+      - mobs:
+          - type: "blaze"
+            name: "§6Temple Blaze"
+            health: 40
+            damage: 10
+            count: 4
+        delay: 5
+      - mobs:
+          - type: "magma_cube"
+            name: "§6Magma Guardian"
+            health: 60
+            damage: 12
+            count: 3
+          - type: "blaze"
+            name: "§6Blaze Elite"
+            health: 50
+            damage: 15
+            count: 2
+        delay: 5
+      - mobs:
+          - type: "ghast"
+            name: "§6Fire Spirit"
+            health: 80
+            damage: 20
+            count: 2
+        delay: 5
+    boss:
+      type: "blaze"
+      name: "§4§lInferno Lord"
+      health: 500
+      damage: 25
+      abilities:
+        - "summon:blaze:2:Fire Minion"
+        - "fire_explosion"
+        - "lightning"
+      phases:
+        - health-percentage: 60
+          message: "§4The Inferno Lord ignites the arena!"
+          damage-multiplier: 1.5
+        - health-percentage: 30
+          message: "§cThe Inferno Lord unleashes hellfire!"
+          damage-multiplier: 2.0
+          summon: "blaze:4:Inferno Minion"
+    loot:
+      guaranteed:
+        - "gold_ingot:0:8"
+        - "blaze_rod:0:4"
+        - "emerald:0:5"
+      random:
+        - item: "diamond:0:2"
+          chance: 40
+        - item: "diamond_sword:0:1"
+          chance: 25
+        - item: "golden_apple:1:1"
+          chance: 15
+        - item: "nether_star:0:1"
+          chance: 5
+
+  void_fortress:
+    display-name: "§5Void Fortress"
+    difficulty: "Hard"
+    min-level: 20
+    max-players: 4
+    cooldown: 7200
+    spawn-position: "200,64,0,world"
+    waves:
+      - mobs:
+          - type: "enderman"
+            name: "§5Void Walker"
+            health: 60
+            damage: 15
+            count: 3
+          - type: "endermite"
+            name: "§5Void Parasite"
+            health: 20
+            damage: 10
+            count: 5
+        delay: 5
+      - mobs:
+          - type: "enderman"
+            name: "§5Void Sentinel"
+            health: 80
+            damage: 20
+            count: 3
+          - type: "shulker"
+            name: "§5Fortress Guard"
+            health: 100
+            damage: 15
+            count: 2
+        delay: 5
+      - mobs:
+          - type: "enderman"
+            name: "§5Void Stalker"
+            health: 100
+            damage: 25
+            count: 4
+          - type: "endermite"
+            name: "§5Void Swarm"
+            health: 15
+            damage: 8
+            count: 8
+        delay: 5
+    boss:
+      type: "enderman"
+      name: "§4§lVoid Emperor"
+      health: 1000
+      damage: 35
+      abilities:
+        - "summon:enderman:2:Void Echo"
+        - "teleport"
+        - "lightning"
+        - "wither_effect"
+      phases:
+        - health-percentage: 70
+          message: "§5The Void Emperor tears reality!"
+          damage-multiplier: 1.3
+        - health-percentage: 40
+          message: "§4The Void Emperor opens the void rift!"
+          damage-multiplier: 1.8
+          summon: "enderman:3:Rift Echo"
+        - health-percentage: 15
+          message: "§cThe Void Emperor enters despair mode!"
+          damage-multiplier: 2.5
+          summon: "endermite:8:Despair Spawn"
+    loot:
+      guaranteed:
+        - "diamond:0:5"
+        - "emerald:0:10"
+        - "ender_pearl:0:8"
+      random:
+        - item: "diamond_sword:0:1"
+          chance: 50
+        - item: "diamond_chestplate:0:1"
+          chance: 30
+        - item: "golden_apple:1:3"
+          chance: 20
+        - item: "nether_star:0:2"
+          chance: 10
+        - item: "elytra:0:1"
+          chance: 3

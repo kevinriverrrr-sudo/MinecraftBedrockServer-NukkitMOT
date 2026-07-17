@@ -1,0 +1,70 @@
+# PvP settings
+pvp:
+  # Spawn protection radius (blocks from world spawn)
+  spawn-protection: 30
+  # New player protection duration (seconds, 0 to disable)
+  new-player-protection: 1800
+  # Combat tag duration (seconds)
+  combat-tag-duration: 15
+  # Combat tag penalty: kill the player if they disconnect while tagged
+  combat-tag-kill-on-quit: true
+
+# Combo settings
+combo:
+  enabled: true
+  # Timeout for combo reset (seconds)
+  timeout: 3
+  # Action bar message: {combo} = combo count
+  message: "§eCombo: §6{combo}§e hits!"
+  # Milestones: combo count -> effect (keys must be quoted strings)
+  milestones:
+    "5":
+      message: "§a§l{player} §r§agot a §65-hit combo!"
+      sound: "random.orb"
+    "10":
+      message: "§b§l{player} §r§bgot a §610-hit combo! §bINSANE!"
+      sound: "random.levelup"
+    "15":
+      message: "§d§l{player} §r§dgot a §615-hit combo! §dGODLIKE!"
+      sound: "random.levelup"
+
+# Kill streak settings
+killstreak:
+  enabled: true
+  milestones:
+    "3":
+      title: "§cRampage"
+      message: "§c{player} is on a RAMPAGE! ({count} kills)"
+    "5":
+      title: "§4Dominating"
+      message: "§4{player} is DOMINATING! ({count} kills)"
+    "7":
+      title: "§5Unstoppable"
+      message: "§5{player} is UNSTOPPABLE! ({count} kills)"
+    "10":
+      title: "§6GODLIKE"
+      message: "§6{player} is GODLIKE! ({count} kills)"
+
+# Custom death messages
+death-messages:
+  default: "§c{victim} was slain by {attacker}"
+  diamond_sword: "§c{victim} was cut down by {attacker}'s diamond blade"
+  iron_sword: "§c{victim} fell to {attacker}'s iron sword"
+  bow: "§c{victim} was sniped by {attacker}"
+  fists: "§7{victim} was punched to death by {attacker} §7§lLOL"
+  combo: "§d{victim} was combo'd into oblivion by {attacker} ({combo} hit combo)"
+  killstreak: "§6{attacker} ended {victim}'s {count} kill streak!"
+
+# ELO settings
+elo:
+  # Starting ELO
+  starting: 1000
+  # K-factor for ELO calculation
+  k-factor: 32
+  # Minimum ELO
+  minimum: 100
+
+# Arena defaults
+arena:
+  countdown: 5
+  match-duration: 300

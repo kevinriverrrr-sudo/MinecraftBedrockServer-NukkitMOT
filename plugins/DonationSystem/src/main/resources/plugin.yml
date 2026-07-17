@@ -1,0 +1,81 @@
+name: DonationSystem
+main: com.server.donationsystem.DonationSystemPlugin
+version: "1.0.0"
+api: ["1.0.0"]
+author: ServerTeam
+description: Donation system with ranks, perks, and codes
+depend: [CustomPerms]
+commands:
+  donate:
+    description: Donation commands
+    usage: "/donate <ranks|info|activate>"
+  donategive:
+    description: Give donor rank
+    usage: "/donategive <player> <rank> [duration]"
+    permission: donate.admin
+  donateremove:
+    description: Remove donor rank
+    usage: "/donateremove <player>"
+    permission: donate.admin
+  donatelist:
+    description: List donors
+    usage: "/donatelist"
+    permission: donate.admin
+  donategencode:
+    description: Generate donation codes
+    usage: "/donategencode <rank> [amount] [duration]"
+    permission: donate.admin
+  fly:
+    description: Toggle flight
+    permission: donate.perk.fly
+  heal:
+    description: Heal yourself
+    permission: donate.perk.heal
+  feed:
+    description: Feed yourself
+    permission: donate.perk.feed
+  repair:
+    description: Repair held item
+    permission: donate.perk.repair
+  hat:
+    description: Wear item as hat
+    permission: donate.perk.hat
+  workbench:
+    description: Open crafting table
+    permission: donate.perk.workbench
+    aliases: ["wb"]
+  enderchest:
+    description: Open ender chest
+    permission: donate.perk.enderchest
+    aliases: ["ec"]
+  back:
+    description: Return to death location
+    permission: donate.perk.back
+permissions:
+  donate.admin:
+    description: Admin donation management
+    default: op
+  donate.perk.fly:
+    description: Fly perk
+    default: false
+  donate.perk.heal:
+    description: Heal perk
+    default: false
+  donate.perk.feed:
+    description: Feed perk
+    default: false
+  donate.perk.repair:
+    description: Repair perk
+    default: false
+  donate.perk.hat:
+    description: Hat perk
+    default: false
+  donate.perk.workbench:
+    description: Workbench perk
+    default: false
+  donate.perk.enderchest:
+    description: Ender chest perk
+    default: false
+  donate.perk.back:
+    description: Back perk
+    default: false

@@ -1,0 +1,950 @@
+package cn.nukkit.level.format.generic;
+
+import cn.nukkit.GameVersion;
+import cn.nukkit.Player;
+import cn.nukkit.Server;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockEntityHolder;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
+import cn.nukkit.entity.Entity;
+import cn.nukkit.level.ChunkManager;
+import cn.nukkit.level.Level;
+import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.persistence.PersistentDataContainer;
+import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.Vector3;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.NumberTag;
+import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.BatchPacket;
+import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * @author MagicDroidX
+ * Nukkit Project
+ */
+public abstract class BaseFullChunk implements FullChunk, ChunkManager {
+
+    protected Long2ObjectNonBlockingMap<Entity> entities;
+
+    protected Long2ObjectNonBlockingMap<BlockEntity> tiles;
+
+    protected Long2ObjectNonBlockingMap<BlockEntity> tileList;
+
+    /**
+     * encoded as:
+     *
+     * (x &lt;&lt; 4) | z
+     */
+    protected byte[] biomes;
+
+    protected byte[] blocks;
+
+    protected byte[] data;
+
+    protected byte[] skyLight;
+
+    protected byte[] blockLight;
+
+    protected short[] heightMap;
+
+    protected List<CompoundTag> NBTtiles;
+
+    /**
+     * Raw NBT of tiles that failed to construct at load time (unregistered/unknown id, or a
+     * constructor that threw). Retained verbatim and round-tripped on save so foreign/modded
+     * tile data is not silently destroyed. Keyed by the same packed local index as {@link #tileList}.
+     */
+    protected Long2ObjectNonBlockingMap<CompoundTag> unknownTiles;
+
+    protected List<CompoundTag> NBTentities;
+
+    protected Map<Integer, Integer> extraData;
+
+    protected LevelProvider provider;
+    protected Class<? extends LevelProvider> providerClass;
+
+    private int x;
+    private int z;
+    private long hash;
+
+    protected AtomicLong changes = new AtomicLong();
+
+    protected boolean isInit;
+
+    protected boolean lightPopulated;
+
+    protected Map<GameVersion, BatchPacket> chunkPackets;
+
+    @Override
+    public BaseFullChunk clone() {
+        BaseFullChunk chunk;
+        try {
+            chunk = (BaseFullChunk) super.clone();
+        } catch (CloneNotSupportedException e) {
+            return null;
+        }
+        if (this.biomes != null) {
+            chunk.biomes = this.biomes.clone();
+        }
+
+        if (this.blocks != null) {
+            chunk.blocks = this.blocks.clone();
+        }
+
+        if (this.data != null) {
+            chunk.data = this.data.clone();
+        }
+
+        if (this.skyLight != null) {
+            chunk.skyLight = this.skyLight.clone();
+        }
+
+        if (this.blockLight != null) {
+            chunk.blockLight = this.blockLight.clone();
+        }
+
+        if (this.heightMap != null) {
+            chunk.heightMap = this.getHeightMapArray().clone();
+        }
+        chunk.changes = new AtomicLong(this.changes.get());
+        return chunk;
+    }
+
+    protected BaseFullChunk cloneForChunkSending() {
+        BaseFullChunk chunk;
+        try {
+            chunk = (BaseFullChunk)super.clone();
+        } catch (CloneNotSupportedException e) {
+            return null;
+        }
+        chunk.changes = new AtomicLong(this.changes.get());
+
+        if (this.tiles != null) {
+            chunk.tiles = new Long2ObjectNonBlockingMap<>();
+            chunk.tiles.putAll(this.tiles);
+        }
+
+        chunk.entities = null;
+        chunk.tileList = null;
+        chunk.NBTentities = null;
+        chunk.NBTtiles = null;
+        chunk.unknownTiles = null;
+        chunk.extraData = null;
+        return chunk;
+    }
+
+    @Deprecated
+    public void setChunkPacket(int protocol, BatchPacket packet) {
+        this.setChunkPacket(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), packet);
+    }
+
+    public void setChunkPacket(GameVersion protocol, BatchPacket packet) {
+        if (packet != null) {
+            packet.trim();
+            if (this.chunkPackets == null) {
+                this.chunkPackets = new Object2ObjectOpenHashMap<>();
+            }
+            this.chunkPackets.put(protocol, packet);
+        }
+    }
+
+    @Deprecated
+    public BatchPacket getChunkPacket(int protocol) {
+        return getChunkPacket(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public BatchPacket getChunkPacket(GameVersion protocol) {
+        if (this.chunkPackets == null) {
+            return null;
+        }
+        BatchPacket pk = this.chunkPackets.get(protocol);
+        if (pk != null) {
+            pk.trim();
+        }
+        return pk;
+    }
+
+    @Override
+    public void initChunk() {
+        if (this.getProvider() != null && !this.isInit) {
+            boolean changed = this.hasChanged();
+            if (this.NBTentities != null) {
+                for (CompoundTag nbt : NBTentities) {
+                    if (!nbt.contains("id")) {
+                        this.setChanged();
+                        continue;
+                    }
+                    ListTag<? extends Tag> pos = nbt.getList("Pos");
+                    if (NukkitMath.floorDouble(((NumberTag<?>) pos.get(0)).getData().doubleValue()) >> 4 != this.x || NukkitMath.floorDouble(((NumberTag<?>) pos.get(2)).getData().doubleValue()) >> 4 != this.z) {
+                        changed = true;
+                        continue;
+                    }
+                    Entity entity = Entity.createEntity(nbt.getString("id"), this, nbt);
+                    if (entity != null) {
+                        changed = true;
+                    }
+                }
+                this.NBTentities = null;
+            }
+
+            if (this.NBTtiles != null) {
+                for (CompoundTag nbt : NBTtiles) {
+                    if (nbt != null) {
+                        if (!nbt.contains("id")) {
+                            changed = true;
+                            continue;
+                        }
+                        if ((nbt.getInt("x") >> 4) != this.x || ((nbt.getInt("z") >> 4) != this.z)) {
+                            changed = true;
+                            continue;
+                        }
+                        BlockEntity blockEntity = BlockEntity.createBlockEntity(nbt.getString("id").replaceFirst("BlockEntity", ""), this, nbt);
+                        if (blockEntity == null) {
+                            // Valid id and coordinates, but the tile type could not be built
+                            // (unregistered/unknown type such as a modded or custom tile, or a
+                            // constructor that threw). Retain the raw NBT so it is round-tripped on
+                            // save instead of being permanently deleted. Do NOT set changed=true:
+                            // force-marking the chunk dirty here is exactly what turned a transient
+                            // load failure into permanent, irreversible data loss.
+                            this.retainUnknownTile(nbt);
+                        }
+                    }
+                }
+                this.NBTtiles = null;
+            }
+
+            this.setChanged(changed);
+
+            this.isInit = true;
+        }
+    }
+
+    @Override
+    public final long getIndex() {
+        return hash;
+    }
+
+    @Override
+    public final int getX() {
+        return x;
+    }
+
+    @Override
+    public final int getZ() {
+        return z;
+    }
+
+    @Override
+    public void setPosition(int x, int z) {
+        this.x = x;
+        this.z = z;
+        this.hash = Level.chunkHash(x, z);
+    }
+
+    @Override
+    public final void setX(int x) {
+        this.x = x;
+        this.hash = Level.chunkHash(x, z);
+    }
+
+    @Override
+    public final void setZ(int z) {
+        this.z = z;
+        this.hash = Level.chunkHash(x, z);
+    }
+
+    @Override
+    public LevelProvider getProvider() {
+        return provider;
+    }
+
+    @Override
+    public void setProvider(LevelProvider provider) {
+        this.provider = provider;
+
+        if (provider != null) {
+            this.providerClass = provider.getClass();
+        }
+    }
+
+    @Override
+    public int getBiomeId(int x, int z) {
+        return this.biomes[(x << 4) | z] & 0xFF;
+    }
+
+    @Override
+    public void setBiomeId(int x, int z, byte biomeId) {
+        this.setChanged();
+        this.biomes[(x << 4) | z] = biomeId;
+    }
+
+    @Override
+    public void setBiomeId(int x, int z, int biomeId) {
+        this.biomes[(x << 4) | z] = (byte) biomeId;
+        this.setChanged();
+    }
+
+    @Override
+    public int getBiomeColor(int x, int z) {
+        return 0;
+    }
+
+    @Override
+    public void setBiomeColor(int x, int z, int r, int g, int b) {
+    }
+
+    @Override
+    public int getHeightMap(int x, int z) {
+        return this.heightMap[(z << 4) | x] + this.getProvider().getMinBlockY();
+    }
+
+    @Override
+    public void setHeightMap(int x, int z, int value) {
+        //基岩版3d-data保存heightMap是以0为索引保存的，所以这里需要减去世界最小值，详情查看
+        //Bedrock Edition 3d-data saves the height map start from index of 0, so need to subtract the world minimum height here, see for details:
+        //https://github.com/bedrock-dev/bedrock-level/blob/main/src/include/data_3d.h#L115
+        this.heightMap[(z << 4) | x] = (short) (value - this.getProvider().getMinBlockY());
+        this.setChanged();
+    }
+
+    @Override
+    public void recalculateHeightMap() {
+        for (int z = 0; z < 16; ++z) {
+            for (int x = 0; x < 16; ++x) {
+                recalculateHeightMapColumn(x, z);
+            }
+        }
+    }
+
+    @Override
+    public int recalculateHeightMapColumn(int x, int z) {
+        int minY = 0;
+        int maxY = 255;
+        LevelProvider providerTemp = this.provider;
+        if (providerTemp != null) {
+            Level levelTemp = providerTemp.getLevel();
+            if (levelTemp != null) {
+                minY = levelTemp.getMinBlockY();
+                maxY = levelTemp.getMaxBlockY();
+            }
+        }
+
+        for (int y = maxY; y >= minY; --y) {
+            if (getBlockId(x, y, z) != BlockID.AIR) {
+                setHeightMap(x, z, y + 1);
+                return y;
+            }
+        }
+
+        setHeightMap(x, z, minY);
+        return minY;
+    }
+
+    @Override
+    public int getBlockExtraData(int x, int y, int z) {
+        int index = Level.chunkBlockHash(x, y, z);
+        if (this.extraData != null && this.extraData.containsKey(index)) {
+            return this.extraData.get(index);
+        }
+
+        return 0;
+    }
+
+    @Override
+    public void setBlockExtraData(int x, int y, int z, int data) {
+        if (data == 0) {
+            if (this.extraData != null) {
+                this.extraData.remove(Level.chunkBlockHash(x, y, z));
+            }
+        } else {
+            if (this.extraData == null) this.extraData = new Int2ObjectOpenHashMap<>();
+            this.extraData.put(Level.chunkBlockHash(x, y, z), data);
+        }
+
+        this.setChanged(true);
+    }
+
+    @Override
+    public void populateSkyLight() {
+        // basic light calculation
+        for (int z = 0; z < 16; ++z) {
+            for (int x = 0; x < 16; ++x) { // iterating over all columns in chunk
+                // heightMap stores y + 1, so top-most block Y = heightMap - 1
+                int top = this.getHeightMap(x, z) - 1;
+
+                int y;
+
+                for (y = this.getProvider().getMaxBlockY(); y > top; --y) {
+                    // all the blocks above the top-most block are exposed to sun and
+                    // thus have a skylight value of 15
+                    this.setBlockSkyLight(x, y, z, 15);
+                }
+
+                int nextLight = 15; // light value that will be applied starting with the next block
+                int nextDecrease = 0; // decrease that that will be applied starting with the next block
+
+                // Process from top-most block downward
+                for (y = top; y >= this.getProvider().getMinBlockY(); --y) {
+                    nextLight -= nextDecrease;
+                    int light = nextLight; // this light value will be applied for this block. The following checks are all about the next blocks
+
+                    if (light < 0) {
+                        light = 0;
+                    }
+
+                    this.setBlockSkyLight(x, y, z, light);
+
+                    if (light == 0) { // skipping block checks, because everything under a block that has a skylight value
+                                      // of 0 also has a skylight value of 0
+                        continue;
+                    }
+
+                    // START of checks for the next block
+                    int id = this.getBlockId(x, y, z);
+
+                    if (!Block.isBlockTransparentById(id)) { // if we encounter an opaque block, all the blocks under it will
+                                           // have a skylight value of 0 (the block itself has a value of 15, if it's a top-most block)
+                        nextLight = 0;
+                    } else if (Block.getBlockDiffusesSkyLight(id)) {
+                        nextDecrease += 1; // skylight value decreases by one for each block under a block
+                                           // that diffuses skylight. The block itself has a value of 15 (if it's a top-most block)
+                    } else {
+                        nextDecrease -= Block.getBlockLightFilter(id); // blocks under a light filtering block will have a skylight value
+                                                            // decreased by the lightFilter value of that block. The block itself
+                                                            // has a value of 15 (if it's a top-most block)
+                    }
+                    // END of checks for the next block
+                }
+            }
+        }
+    }
+
+    @Override
+    public void populateBlockLight() {
+        int minY = this.getProvider().getMinBlockY();
+        int maxY = this.getProvider().getMaxBlockY();
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    int blockId = this.getBlockId(x, y, z);
+                    int lightLevel = Block.getBlockLight(blockId);
+                    if (lightLevel > 0) {
+                        this.setBlockLight(x, y, z, lightLevel);
+                    }
+                }
+            }
+        }
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    int currentLight = this.getBlockLight(x, y, z);
+                    if (currentLight > 1) {
+                        // Propagate to neighbors within chunk
+                        propagateBlockLightToNeighbor(x - 1, y, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x + 1, y, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y - 1, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y + 1, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y, z - 1, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y, z + 1, currentLight, minY, maxY);
+                    }
+                }
+            }
+        }
+    }
+
+    private void propagateBlockLightToNeighbor(int x, int y, int z, int sourceLight, int minY, int maxY) {
+        // Check bounds (only within chunk)
+        if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < minY || y > maxY) {
+            return;
+        }
+
+        int blockId = this.getBlockId(x, y, z);
+        int lightFilter = Block.getBlockLightFilter(blockId);
+        int newLight = sourceLight - Math.max(1, lightFilter);
+
+        if (newLight > 0 && newLight > this.getBlockLight(x, y, z)) {
+            this.setBlockLight(x, y, z, newLight);
+        }
+    }
+
+    @Override
+    public int getHighestBlockAt(int x, int z) {
+        return this.getHighestBlockAt(x, z, true);
+    }
+
+    @Override
+    public int getHighestBlockAt(int x, int z, boolean cache) {
+        int minY = 0;
+        int maxY = 127; // Don't go out of bounds when nether chunk is unloading
+        LevelProvider providerTemp = this.provider;
+        if (providerTemp != null) {
+            Level levelTemp = providerTemp.getLevel();
+            if (levelTemp != null) {
+                minY = levelTemp.getMinBlockY();
+                maxY = levelTemp.getMaxBlockY();
+            } else {
+                cache = false;
+            }
+        } else {
+            cache = false;
+        }
+
+        if (cache) {
+            int h = this.getHeightMap(x, z);
+            if (h > minY && h <= maxY + 1) {
+                int highestY = h - 1;
+                // Verify cache is not stale
+                if (getBlockId(x, highestY, z) != BlockID.AIR) {
+                    return highestY;
+                }
+            }
+        }
+
+        for (int y = maxY; y >= minY; --y) {
+            if (getBlockId(x, y, z) != BlockID.AIR) {
+                if (cache) {
+                    this.setHeightMap(x, z, y + 1);
+                }
+                return y;
+            }
+        }
+        if (cache) {
+            this.setHeightMap(x, z, minY);
+        }
+        return minY;
+    }
+
+    @Override
+    public void addEntity(Entity entity) {
+        if (this.entities == null) {
+            this.entities = new Long2ObjectNonBlockingMap<>();
+        }
+        this.entities.put(entity.getId(), entity);
+        if (!(entity instanceof Player) && this.isInit) {
+            this.setChanged();
+        }
+    }
+
+    @Override
+    public void removeEntity(Entity entity) {
+        if (this.entities != null) {
+            this.entities.remove(entity.getId());
+            if (!(entity instanceof Player) && this.isInit) {
+                this.setChanged();
+            }
+        }
+    }
+
+    @Override
+    public void addBlockEntity(BlockEntity blockEntity) {
+        if (this.tiles == null) {
+            this.tiles = new Long2ObjectNonBlockingMap<>();
+            this.tileList = new Long2ObjectNonBlockingMap<>();
+        }
+        this.tiles.put(blockEntity.getId(), blockEntity);
+        int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
+        int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
+        if (this.unknownTiles != null) {
+            this.unknownTiles.remove(index); // a real tile now occupies this slot
+        }
+        var existing = this.tileList.put(index, blockEntity);
+        if (existing != null && existing != blockEntity) {
+            this.tiles.remove(existing.getId());
+            existing.onReplacedWith(blockEntity);
+            existing.close();
+        }
+        if (this.isInit) {
+            this.setChanged();
+        }
+    }
+
+    @Override
+    public void removeBlockEntity(BlockEntity blockEntity) {
+        if (this.tiles != null) {
+            this.tiles.remove(blockEntity.getId());
+            int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
+            int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
+            this.tileList.remove(index, blockEntity);
+
+            if (!(blockEntity instanceof PersistentDataContainerBlockEntity) && blockEntity.hasPersistentDataContainer()) {
+                this.createPersistentBlockContainer(blockEntity, blockEntity.getPersistentDataContainer().getStorage());
+            }
+
+            if (this.isInit) {
+                this.setChanged();
+            }
+        }
+    }
+
+    private BlockEntity createPersistentBlockContainer(Vector3 pos, CompoundTag storage) {
+        CompoundTag tag = BlockEntity.getDefaultCompound(pos, BlockEntity.PERSISTENT_CONTAINER);
+        tag.putCompound(PersistentDataContainer.STORAGE_TAG, storage);
+        return BlockEntity.createBlockEntity(BlockEntity.PERSISTENT_CONTAINER, this, tag);
+    }
+
+    @Override
+    public Map<Long, Entity> getEntities() {
+        return entities == null ? Collections.emptyMap() : entities;
+    }
+
+    @Override
+    public Map<Long, BlockEntity> getBlockEntities() {
+        return tiles == null ? Collections.emptyMap() : tiles;
+    }
+
+    /**
+     * Raw NBT of tiles whose type could not be constructed at load time, kept verbatim so the
+     * data survives a load/save round-trip instead of being silently deleted. Consumed by the
+     * disk chunk serializers only; never sent to clients.
+     */
+    public Collection<CompoundTag> getUnknownTiles() {
+        return this.unknownTiles == null ? Collections.emptyList() : this.unknownTiles.values();
+    }
+
+    /**
+     * Retain a tile NBT that could not be turned into a {@link BlockEntity} (unknown/unregistered
+     * type or failing constructor) so it is preserved on the next save rather than deleted.
+     */
+    private void retainUnknownTile(CompoundTag nbt) {
+        if (this.getProvider() == null) {
+            return;
+        }
+        int index = ((nbt.getInt("z") & 0x0f) << 16) | ((nbt.getInt("x") & 0x0f) << 12)
+                | (nbt.getInt("y") - this.getProvider().getMinBlockY());
+        if (this.tileList != null && this.tileList.get(index) != null) {
+            return; // a successfully-constructed tile already occupies this slot
+        }
+        if (this.unknownTiles == null) {
+            this.unknownTiles = new Long2ObjectNonBlockingMap<>();
+        }
+        this.unknownTiles.put(index, nbt);
+    }
+
+    /**
+     * Drop a retained unknown-tile NBT (see {@link #retainUnknownTile}) once the block at this
+     * position can no longer host a block entity — e.g. it was broken to air or replaced with a
+     * non-tile block such as stone. Without this, a removed/replaced modded tile would be
+     * resurrected from {@link #unknownTiles} on the next save. Coordinates are chunk-local
+     * (x, z in 0..15; y absolute).
+     */
+    protected void removeInvalidUnknownTile(int x, int y, int z) {
+        if (this.unknownTiles == null || this.getProvider() == null) {
+            return;
+        }
+        int index = ((z & 0x0f) << 16) | ((x & 0x0f) << 12) | (y - this.getProvider().getMinBlockY());
+        if (!this.unknownTiles.containsKey(index)) {
+            return;
+        }
+        // Keep it while the slot can still legitimately hold a block entity: the matching tile may
+        // simply not be constructed yet, and a real tile placed later is deduplicated by
+        // addBlockEntity(). Only drop it when the current block clearly cannot host one.
+        if (!(Block.get(this.getBlockId(x, y, z)) instanceof BlockEntityHolder)) {
+            this.unknownTiles.remove(index);
+        }
+    }
+
+    @Override
+    public Map<Integer, Integer> getBlockExtraDataArray() {
+        return extraData == null ? Collections.emptyMap() : extraData;
+    }
+
+    @Override
+    public BlockEntity getTile(int x, int y, int z) {
+        if (this.tileList == null || this.getProvider() == null)  {
+            return null;
+        }
+        int capY = y - this.getProvider().getMinBlockY();
+        return this.tileList.get((z << 16) | (x << 12) | capY);
+
+    }
+
+    @Override
+    public boolean isLoaded() {
+        return this.getProvider() != null && this.getProvider().isChunkLoaded(this.x, this.z);
+    }
+
+    @Override
+    public boolean load() throws IOException {
+        return this.load(true);
+    }
+
+    @Override
+    public boolean load(boolean generate) throws IOException {
+        return this.getProvider() != null && this.getProvider().getChunk(this.x, this.z, true) != null;
+    }
+
+    @Override
+    public boolean unload() throws Exception {
+        return this.unload(provider.getLevel().getAutoSave(), true);
+    }
+
+    @Override
+    public boolean unload(boolean save) throws Exception {
+        return this.unload(save, true);
+    }
+
+    @Override
+    public boolean unload(boolean save, boolean safe) {
+        LevelProvider provider = this.getProvider();
+        if (provider == null) {
+            return true;
+        }
+        if (save && this.changes.get() != 0) {
+            provider.saveChunk(this.x, this.z);
+        }
+        if (safe) {
+            for (Entity entity : this.getEntities().values()) {
+                if (entity instanceof Player) {
+                    return false;
+                }
+            }
+        }
+        for (Entity entity : new ArrayList<>(this.getEntities().values())) {
+            if (entity instanceof Player) {
+                continue;
+            }
+            entity.close();
+        }
+
+        for (BlockEntity blockEntity : new ArrayList<>(this.getBlockEntities().values())) {
+            blockEntity.close();
+        }
+        this.provider = null;
+        return true;
+    }
+
+    @Override
+    public byte[] getBlockIdArray() {
+        return this.blocks;
+    }
+
+    @Override
+    public byte[] getBlockDataArray() {
+        return this.data;
+    }
+
+    @Override
+    public byte[] getBlockSkyLightArray() {
+        return this.skyLight;
+    }
+
+    @Override
+    public byte[] getBlockLightArray() {
+        return this.blockLight;
+    }
+
+    @Override
+    public byte[] getBiomeIdArray() {
+        return this.biomes;
+    }
+
+    @Override
+    public void setBiomeIdArray(byte[] biomeIdArray) {
+        this.biomes = biomeIdArray;
+        this.setChanged();
+    }
+
+    @Override
+    public short[] getHeightMapArray() {
+        return this.heightMap;
+    }
+
+    public long getChanges() {
+        return changes.get();
+    }
+
+    @Override
+    public boolean hasChanged() {
+        return this.changes.get() != 0;
+    }
+
+    @Override
+    public void setChanged() {
+        this.changes.incrementAndGet();
+        chunkPackets = null;
+    }
+
+    @Override
+    public void setChanged(boolean changed) {
+        if (changed) {
+            setChanged();
+        } else {
+            changes.set(0);
+        }
+    }
+
+    /**
+     * Atomically clear dirty flag only if no new modifications occurred since the snapshot.
+     * Used by async save to avoid clearing changes made during the save window.
+     *
+     * @param snapshot the changes value captured before serialization
+     * @return true if successfully cleared, false if new changes were made
+     */
+    public boolean clearChangesIfUnmodified(long snapshot) {
+        return changes.compareAndSet(snapshot, 0);
+    }
+
+    @Override
+    public byte[] toFastBinary() {
+        return this.toBinary();
+    }
+
+    @Override
+    public boolean isLightPopulated() {
+        return this.lightPopulated;
+    }
+
+    @Override
+    public void setLightPopulated() {
+        this.setLightPopulated(true);
+    }
+
+    @Override
+    public void setLightPopulated(boolean value) {
+        this.lightPopulated = value;
+        this.setChanged();
+    }
+
+    @Override
+    public int getBlockIdAt(int x, int y, int z) {
+        return getBlockIdAt(x, y, z, 0);
+    }
+
+    @Override
+    public int getBlockIdAt(int x, int y, int z, int layer) {
+        if (x >> 4 == this.x && z >> 4 == this.z) {
+            return getBlockId(x & 15, y, z & 15, layer);
+        }
+        return 0;
+    }
+
+    @Override
+    public void setBlockFullIdAt(int x, int y, int z, int fullId) {
+        setFullBlockId(x, y, z, 0, fullId);
+    }
+
+    @Override
+    public void setBlockFullIdAt(int x, int y, int z, int layer, int fullId) {
+        if (x >> 4 == getX() && z >> 4 == getZ()) {
+            setFullBlockId(x & 15, y, z & 15, layer, fullId);
+        }
+    }
+
+    @Override
+    public boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId) {
+        return setBlockAtLayer(x, y, z, layer, blockId, 0);
+    }
+
+    @Override
+    public boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId, int meta) {
+        int oldId = getBlockId(x, y, z, layer);
+        int oldData = getBlockData(x, y, z, layer);
+        if (oldId != blockId || oldData != meta) {
+            setBlock(x, y, z, layer, blockId);
+            setBlockData(x, y, z, layer, meta);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public void setBlockIdAt(int x, int y, int z, int id) {
+        setBlockIdAt(x, y, z, 0, id);
+    }
+
+    @Override
+    public void setBlockIdAt(int x, int y, int z, int layer, int id) {
+        if (x >> 4 == this.x && z >> 4 == this.z) {
+            setBlockId(x & 15, y, z & 15, layer, id);
+        }
+    }
+
+    @Override
+    public void setBlockAt(int x, int y, int z, int id, int data) {
+        if (x >> 4 == getX() && z >> 4 == getZ()) {
+            setBlock(x & 15, y, z & 15, id, data);
+        }
+    }
+
+    @Override
+    public int getBlockDataAt(int x, int y, int z) {
+        return getBlockDataAt(x, y, z, 0);
+    }
+
+    @Override
+    public int getBlockDataAt(int x, int y, int z, int layer) {
+        if (x >> 4 == this.x && z >> 4 == this.z) {
+            return getBlockIdAt(x & 15, y, z & 15, layer);
+        }
+        return 0;
+    }
+
+    @Override
+    public void setBlockDataAt(int x, int y, int z, int data) {
+        setBlockDataAt(x, y, z, 0, data);
+    }
+
+    @Override
+    public void setBlockDataAt(int x, int y, int z, int layer, int data) {
+        if (x >> 4 == this.x && z >> 4 == this.z) {
+            setBlockData(x & 15, y, z & 15, layer, data);
+        }
+    }
+
+    @Override
+    public BaseFullChunk getChunk(int chunkX, int chunkZ) {
+        if (chunkX == this.x && chunkZ == this.z) return this;
+        return null;
+    }
+
+    @Override
+    public void setChunk(int chunkX, int chunkZ) {
+        setChunk(chunkX, chunkZ, null);
+    }
+
+    @Override
+    public void setChunk(int chunkX, int chunkZ, BaseFullChunk chunk) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public long getSeed() {
+        throw new UnsupportedOperationException("Chunk does not have a seed");
+    }
+
+    @Override
+    public int getMinBlockY() {
+        return this.getProvider().getMinBlockY();
+    }
+
+    @Override
+    public int getMaxBlockY() {
+        return this.getProvider().getMaxBlockY();
+    }
+
+    public boolean compress() {
+        if (this.chunkPackets == null) {
+            return false;
+        }
+        for (BatchPacket pk : this.chunkPackets.values()) {
+            if (pk != null) {
+                pk.trim();
+            }
+        }
+        return !this.chunkPackets.isEmpty();
+    }
+}

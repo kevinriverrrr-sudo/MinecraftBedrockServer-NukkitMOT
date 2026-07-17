@@ -1,0 +1,52 @@
+# Default group for new players
+default-group: player
+# Storage type: yaml (only yaml for now)
+storage: yaml
+# Auto-save interval in seconds
+auto-save: 300
+# Default groups configuration
+groups:
+  player:
+    prefix: "§7[Player] "
+    suffix: ""
+    priority: 0
+    is-default: true
+    permissions:
+      - customperms.user
+      - server.kit.starter
+      - server.chat.color
+    parents: []
+  vip:
+    prefix: "§a[VIP] "
+    suffix: ""
+    priority: 10
+    is-default: false
+    permissions:
+      - server.kit.vip
+      - server.chat.bold
+      - server.fly
+    parents:
+      - player
+  premium:
+    prefix: "§6[Premium] "
+    suffix: ""
+    priority: 20
+    is-default: false
+    permissions:
+      - server.kit.premium
+      - server.chat.bold
+      - server.chat.italic
+      - server.fly
+      - server.heal
+    parents:
+      - vip
+  admin:
+    prefix: "§c[Admin] "
+    suffix: ""
+    priority: 100
+    is-default: false
+    permissions:
+      - customperms.admin
+      - server.*
+    parents:
+      - premium

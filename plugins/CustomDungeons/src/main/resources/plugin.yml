@@ -1,0 +1,19 @@
+name: CustomDungeons
+main: com.server.customdungeons.CustomDungeonsPlugin
+version: "1.0.0"
+api: ["1.0.0"]
+author: ServerTeam
+description: Custom dungeon system with bosses and loot
+depend: [CustomPerms]
+commands:
+  dungeon:
+    description: Dungeon commands
+    usage: "/dungeon <list|enter|leave|party|leaderboard>"
+    aliases: ["dg"]
+permissions:
+  dungeon.use:
+    description: Use dungeons
+    default: true
+  dungeon.admin:
+    description: Admin dungeon commands
+    default: op

@@ -1,0 +1,36 @@
+# Compiled class files
+*.class
+
+# Log files
+*.log
+logs/
+
+# Server runtime data
+worlds/
+players/
+banned-ips.json
+banned-players.json
+ops.txt
+white-list.txt
+nukkit-mot.yml
+resource_packs/
+bin/
+scoreboard.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Build output (keep JARs in build/ though)
+build/classes/
+.gradle/
+target/
+build/tmp/

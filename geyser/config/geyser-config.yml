@@ -1,0 +1,44 @@
+# GeyserMC Configuration for Minecraft Bedrock Server
+# This allows Java Edition players to connect to the Bedrock (Nukkit-MOT) server
+
+bedrock:
+  # The IP address that Geyser will listen on for Bedrock clients
+  address: 0.0.0.0
+  # The port that Geyser will listen on for Bedrock clients
+  # This should be DIFFERENT from the Nukkit server port
+  port: 19133
+  # Clone the remote server's gamerules for the Bedrock client
+  clone-remote-port: false
+
+remote:
+  # The IP address of the remote (Nukkit-MOT) server
+  address: 127.0.0.1
+  # The port of the remote (Nukkit-MOT) server  
+  port: 19132
+  # Authentication type: offline, online, floodgate
+  auth-type: offline
+  # Whether the remote server is a Bedrock server (Nukkit)
+  # This is important - set to true for Nukkit-MOT
+  bedrock: true
+
+# General settings
+general:
+  # Debug mode
+  debug-mode: false
+  # Allow third-party capes
+  allow-third-party-capes: true
+  # Allow third-party deadmau5 ears
+  allow-third-party-ears: false
+  # Show cooldown on items
+  show-cooldown: true
+  # Show the "Emotes" button in the pause menu
+  show-emotes: true
+
+# Metrics
+metrics:
+  enabled: false
+
+# Floodgate settings (for offline mode)
+floodgate:
+  # Whether to use Floodgate for offline mode
+  enabled: false

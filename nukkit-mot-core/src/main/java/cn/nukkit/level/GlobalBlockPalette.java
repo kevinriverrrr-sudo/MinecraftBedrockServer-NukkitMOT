@@ -1,0 +1,720 @@
+package cn.nukkit.level;
+
+import cn.nukkit.GameVersion;
+import cn.nukkit.Server;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.utils.BinaryStream;
+import com.google.common.io.ByteStreams;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import lombok.extern.log4j.Log4j2;
+
+import java.io.*;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.GZIPInputStream;
+
+@Log4j2
+public class GlobalBlockPalette {
+
+    private static final Gson GSON = new Gson();
+    private static boolean initialized;
+    private static volatile boolean useHashedBlockNetworkIds;
+
+    private static final AtomicInteger runtimeIdAllocator282 = new AtomicInteger(0);
+    private static final AtomicInteger runtimeIdAllocator291 = new AtomicInteger(0);
+    private static final AtomicInteger runtimeIdAllocator313 = new AtomicInteger(0);
+    private static final AtomicInteger runtimeIdAllocator332 = new AtomicInteger(0);
+    private static final AtomicInteger runtimeIdAllocator340 = new AtomicInteger(0);
+    private static final AtomicInteger runtimeIdAllocator354 = new AtomicInteger(0);
+    private static final AtomicInteger runtimeIdAllocator361 = new AtomicInteger(0);
+    private static final AtomicInteger runtimeIdAllocator388 = new AtomicInteger(0);
+    private static final AtomicInteger runtimeIdAllocator389 = new AtomicInteger(0);
+    private static final AtomicInteger runtimeIdAllocator407 = new AtomicInteger(0);
+
+    private static final Int2IntOpenHashMap legacyToRuntimeId223 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId261 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId274 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId282 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId291 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId313 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId332 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId340 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId354 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId361 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId388 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId389 = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap legacyToRuntimeId407 = new Int2IntOpenHashMap();
+
+    private static final Map<GameVersion, BlockPalette> paletteCache = new ConcurrentHashMap<>();
+
+    // Standard protocol → palette version mapping (threshold protocol → palette GameVersion)
+    private static final NavigableMap<Integer, GameVersion> STANDARD_PALETTE_THRESHOLDS = new TreeMap<>();
+    // NetEase protocol → palette version mapping
+    private static final NavigableMap<Integer, GameVersion> NETEASE_PALETTE_THRESHOLDS = new TreeMap<>();
+
+    static {
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_16_100, GameVersion.V1_16_100);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_16_210, GameVersion.V1_16_210);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_17_0, GameVersion.V1_17_0);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_17_10, GameVersion.V1_17_10);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_17_30, GameVersion.V1_17_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_17_40, GameVersion.V1_17_40);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_18_10_26, GameVersion.V1_18_10);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_18_30, GameVersion.V1_18_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_0_29, GameVersion.V1_19_0);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_20, GameVersion.V1_19_20);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_50_20, GameVersion.V1_19_50);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_60, GameVersion.V1_19_60);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_70_24, GameVersion.V1_19_70);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_19_80, GameVersion.V1_19_80);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_0_23, GameVersion.V1_20_0);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_10_21, GameVersion.V1_20_10);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_30_24, GameVersion.V1_20_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_40, GameVersion.V1_20_40);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_50, GameVersion.V1_20_50);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_60, GameVersion.V1_20_60);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_70, GameVersion.V1_20_70);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_20_80, GameVersion.V1_20_80);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_0, GameVersion.V1_21_0);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_20, GameVersion.V1_21_20);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_30, GameVersion.V1_21_30);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_40, GameVersion.V1_21_40);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_50_26, GameVersion.V1_21_50);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_60, GameVersion.V1_21_60);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_70_24, GameVersion.V1_21_70);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_80, GameVersion.V1_21_80);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_90, GameVersion.V1_21_90);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_100, GameVersion.V1_21_100);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_21_110_26, GameVersion.V1_21_111);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_10, GameVersion.V1_26_10);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_20_26, GameVersion.V1_26_20);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_30, GameVersion.V1_26_30);
+
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_20_50_NETEASE.getProtocol(), GameVersion.V1_20_50_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_2_NETEASE.getProtocol(), GameVersion.V1_21_2_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_50_NETEASE.getProtocol(), GameVersion.V1_21_50_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_93_NETEASE.getProtocol(), GameVersion.V1_21_93_NETEASE);
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_124_NETEASE.getProtocol(), GameVersion.V1_21_124_NETEASE);
+    }
+
+    private static byte[] compiledTable282;
+    private static byte[] compiledTable291;
+    private static byte[] compiledTable313;
+    private static byte[] compiledTable332;
+    private static byte[] compiledTable340;
+    private static byte[] compiledTable354;
+    private static byte[] compiledTable361;
+    private static byte[] compiledTable388;
+    private static byte[] compiledTable389;
+    private static byte[] compiledTable407;
+
+    static {
+        legacyToRuntimeId223.defaultReturnValue(-1);
+        legacyToRuntimeId261.defaultReturnValue(-1);
+        legacyToRuntimeId274.defaultReturnValue(-1);
+        legacyToRuntimeId282.defaultReturnValue(-1);
+        legacyToRuntimeId291.defaultReturnValue(-1);
+        legacyToRuntimeId313.defaultReturnValue(-1);
+        legacyToRuntimeId332.defaultReturnValue(-1);
+        legacyToRuntimeId340.defaultReturnValue(-1);
+        legacyToRuntimeId354.defaultReturnValue(-1);
+        legacyToRuntimeId361.defaultReturnValue(-1);
+        legacyToRuntimeId388.defaultReturnValue(-1);
+        legacyToRuntimeId389.defaultReturnValue(-1);
+        legacyToRuntimeId407.defaultReturnValue(-1);
+
+        // cache current block palette
+        getPaletteByProtocol(GameVersion.getLastVersion());
+        if (Server.getInstance().netEaseMode) {
+            getPaletteByProtocol(GameVersion.V1_21_50_NETEASE);
+        }
+    }
+
+    public static void init() {
+        if (initialized) {
+            throw new IllegalStateException("BlockPalette was already generated!");
+        }
+        initialized = true;
+        log.debug("Loading block palette...");
+
+        // 223
+        InputStream stream223 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_223.json");
+        if (stream223 == null) throw new AssertionError("Unable to locate RuntimeID table 223");
+        Collection<TableEntryOld> entries223 = GSON.fromJson(new InputStreamReader(stream223, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
+        for (TableEntryOld entry : entries223) {
+            registerLegacyState(legacyToRuntimeId223, 4, entry.id, entry.data, entry.runtimeID);
+        }
+        // Compiled table not needed for 223
+        // 261
+        InputStream stream261 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_261.json");
+        if (stream261 == null) throw new AssertionError("Unable to locate RuntimeID table 261");
+        Collection<TableEntryOld> entries261 = GSON.fromJson(new InputStreamReader(stream261, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
+        for (TableEntryOld entry : entries261) {
+            registerLegacyState(legacyToRuntimeId261, 4, entry.id, entry.data, entry.runtimeID);
+        }
+        // Compiled table not needed 261
+        // 274
+        InputStream stream274 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_274.json");
+        if (stream274 == null) throw new AssertionError("Unable to locate RuntimeID table 274");
+        Collection<TableEntryOld> entries274 = GSON.fromJson(new InputStreamReader(stream274, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
+        for (TableEntryOld entry : entries274) {
+            registerLegacyState(legacyToRuntimeId274, 4, entry.id, entry.data, entry.runtimeID);
+        }
+        // Compiled table not needed 274
+        // 282
+        InputStream stream282 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_282.json");
+        if (stream282 == null) throw new AssertionError("Unable to locate RuntimeID table 282");
+        Collection<TableEntry> entries282 = GSON.fromJson(new InputStreamReader(stream282, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        BinaryStream table282 = new BinaryStream();
+        table282.putUnsignedVarInt(entries282.size());
+        for (TableEntry entry : entries282) {
+            registerLegacyState(legacyToRuntimeId282, 4, entry.id, entry.data, runtimeIdAllocator282.getAndIncrement());
+            table282.putString(entry.name);
+            table282.putLShort(entry.data);
+        }
+        compiledTable282 = table282.getBuffer();
+        // 291
+        InputStream stream291 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_291.json");
+        if (stream291 == null) throw new AssertionError("Unable to locate RuntimeID table 291");
+        Collection<TableEntry> entries291 = GSON.fromJson(new InputStreamReader(stream291, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        BinaryStream table291 = new BinaryStream();
+        table291.putUnsignedVarInt(entries291.size());
+        for (TableEntry entry : entries291) {
+            registerLegacyState(legacyToRuntimeId291, 4, entry.id, entry.data, runtimeIdAllocator291.getAndIncrement());
+            table291.putString(entry.name);
+            table291.putLShort(entry.data);
+        }
+        compiledTable291 = table291.getBuffer();
+        // 313
+        InputStream stream313 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_313.json");
+        if (stream313 == null) throw new AssertionError("Unable to locate RuntimeID table 313");
+        Collection<TableEntry> entries313 = GSON.fromJson(new InputStreamReader(stream313, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        BinaryStream table313 = new BinaryStream();
+        table313.putUnsignedVarInt(entries313.size());
+        for (TableEntry entry : entries313) {
+            registerLegacyState(legacyToRuntimeId313, 4, entry.id, entry.data, runtimeIdAllocator313.getAndIncrement());
+            table313.putString(entry.name);
+            table313.putLShort(entry.data);
+        }
+        compiledTable313 = table313.getBuffer();
+        // 332
+        InputStream stream332 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_332.json");
+        if (stream332 == null) throw new AssertionError("Unable to locate RuntimeID table 332");
+        Collection<TableEntry> entries332 = GSON.fromJson(new InputStreamReader(stream332, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        BinaryStream table332 = new BinaryStream();
+        table332.putUnsignedVarInt(entries332.size());
+        for (TableEntry entry : entries332) {
+            registerLegacyState(legacyToRuntimeId332, 4, entry.id, entry.data, runtimeIdAllocator332.getAndIncrement());
+            table332.putString(entry.name);
+            table332.putLShort(entry.data);
+        }
+        compiledTable332 = table332.getBuffer();
+        // 340
+        InputStream stream340 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_340.json");
+        if (stream340 == null) throw new AssertionError("Unable to locate RuntimeID table 340");
+        Collection<TableEntry> entries340 = GSON.fromJson(new InputStreamReader(stream340, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        BinaryStream table340 = new BinaryStream();
+        table340.putUnsignedVarInt(entries340.size());
+        for (TableEntry entry : entries340) {
+            registerLegacyState(legacyToRuntimeId340, 4, entry.id, entry.data, runtimeIdAllocator340.getAndIncrement());
+            table340.putString(entry.name);
+            table340.putLShort(entry.data);
+        }
+        compiledTable340 = table340.getBuffer();
+        // 354
+        InputStream stream354 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_354.json");
+        if (stream354 == null) throw new AssertionError("Unable to locate RuntimeID table 354");
+        Collection<TableEntry> entries354 = GSON.fromJson(new InputStreamReader(stream354, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        BinaryStream table354 = new BinaryStream();
+        table354.putUnsignedVarInt(entries354.size());
+        for (TableEntry entry : entries354) {
+            registerLegacyState(legacyToRuntimeId354, 4, entry.id, entry.data, runtimeIdAllocator354.getAndIncrement());
+            table354.putString(entry.name);
+            table354.putLShort(entry.data);
+        }
+        compiledTable354 = table354.getBuffer();
+        // 361
+        InputStream stream361 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_361.json");
+        if (stream361 == null) throw new AssertionError("Unable to locate RuntimeID table 361");
+        Collection<TableEntry> entries361 = GSON.fromJson(new InputStreamReader(stream361, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        BinaryStream table361 = new BinaryStream();
+        table361.putUnsignedVarInt(entries361.size());
+        for (TableEntry entry : entries361) {
+            registerLegacyState(legacyToRuntimeId361, 4, entry.id, entry.data, runtimeIdAllocator361.getAndIncrement());
+            table361.putString(entry.name);
+            table361.putLShort(entry.data);
+            table361.putLShort(entry.id);
+        }
+        compiledTable361 = table361.getBuffer();
+        // 388
+        InputStream stream388 = Server.class.getClassLoader().getResourceAsStream("runtime_block_states_388.dat");
+        if (stream388 == null) throw new AssertionError("Unable to locate block state nbt 388");
+        ListTag<CompoundTag> tag388;
+        try {
+            compiledTable388 = ByteStreams.toByteArray(stream388);
+            //noinspection unchecked
+            tag388 = (ListTag<CompoundTag>) NBTIO.readNetwork(new ByteArrayInputStream(compiledTable388));
+        } catch (IOException e) {
+            throw new AssertionError(e);
+        }
+        for (CompoundTag state : tag388.getAll()) {
+            int runtimeId = runtimeIdAllocator388.getAndIncrement();
+            if (!state.contains("meta")) continue;
+            for (int val : state.getIntArray("meta")) {
+                registerLegacyState(legacyToRuntimeId388, 6, state.getShort("id"), val, runtimeId);
+            }
+            state.remove("meta");
+        }
+        // 389
+        InputStream stream389 = Server.class.getClassLoader().getResourceAsStream("runtime_block_states_389.dat");
+        if (stream389 == null) throw new AssertionError("Unable to locate block state nbt 389");
+        ListTag<CompoundTag> tag389;
+        try {
+            //noinspection unchecked
+            tag389 = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream389)), ByteOrder.BIG_ENDIAN, false);
+        } catch (IOException e) {
+            throw new AssertionError("Unable to load block palette 389", e);
+        }
+        for (CompoundTag state : tag389.getAll()) {
+            int runtimeId = runtimeIdAllocator389.getAndIncrement();
+            if (!state.contains("meta")) continue;
+            for (int val : state.getIntArray("meta")) {
+                registerLegacyState(legacyToRuntimeId389, 6, state.getShort("id"), val, runtimeId);
+            }
+            state.remove("meta");
+        }
+        try {
+            compiledTable389 = NBTIO.write(tag389, ByteOrder.LITTLE_ENDIAN, true);
+        } catch (IOException e) {
+            throw new AssertionError("Unable to write block palette 389", e);
+        }
+        // 407
+        ListTag<CompoundTag> tag407;
+        try (InputStream stream407 = Server.class.getClassLoader().getResourceAsStream("runtime_block_states_407.dat")) {
+            if (stream407 == null) {
+                throw new AssertionError("Unable to locate block state nbt 407");
+            }
+            //noinspection unchecked
+            tag407 = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream407)), ByteOrder.BIG_ENDIAN, false);
+        } catch (IOException e) {
+            throw new AssertionError("Unable to load block palette 407", e);
+        }
+        for (CompoundTag state : tag407.getAll()) {
+            int id = state.getInt("id");
+            int data = state.getShort("data");
+            int runtimeId = runtimeIdAllocator407.getAndIncrement();
+            registerLegacyState(legacyToRuntimeId407, 6, id, data, runtimeId);
+            state.remove("data");
+        }
+        try {
+            compiledTable407 = NBTIO.write(tag407, ByteOrder.LITTLE_ENDIAN, true);
+        } catch (IOException e) {
+            throw new AssertionError("Unable to write block palette 407", e);
+        }
+
+        compactCaches();
+    }
+
+    /**
+     * Trims global palette lookup tables after registration so long-lived caches keep a smaller footprint.
+     */
+    public static void compactCaches() {
+        trimLegacyMap(legacyToRuntimeId223);
+        trimLegacyMap(legacyToRuntimeId261);
+        trimLegacyMap(legacyToRuntimeId274);
+        trimLegacyMap(legacyToRuntimeId282);
+        trimLegacyMap(legacyToRuntimeId291);
+        trimLegacyMap(legacyToRuntimeId313);
+        trimLegacyMap(legacyToRuntimeId332);
+        trimLegacyMap(legacyToRuntimeId340);
+        trimLegacyMap(legacyToRuntimeId354);
+        trimLegacyMap(legacyToRuntimeId361);
+        trimLegacyMap(legacyToRuntimeId388);
+        trimLegacyMap(legacyToRuntimeId389);
+        trimLegacyMap(legacyToRuntimeId407);
+
+        for (BlockPalette palette : paletteCache.values()) {
+            palette.trim();
+        }
+    }
+
+    /**
+     * Applies fastutil's in-place trim operation to a legacy lookup map.
+     */
+    private static void trimLegacyMap(Int2IntOpenHashMap map) {
+        map.trim();
+    }
+
+    /**
+     * Registers a legacy state mapping and records the block state as observed for sparse prototype caching.
+     */
+    private static void registerLegacyState(Int2IntOpenHashMap map, int dataBits, int id, int data, int runtimeId) {
+        map.put((id << dataBits) | data, runtimeId);
+        Block.registerKnownState(id, data);
+    }
+
+    @Deprecated
+    public static BlockPalette getPaletteByProtocol(int protocol) {
+        return getPaletteByProtocol(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public static BlockPalette getPaletteByProtocol(GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
+        NavigableMap<Integer, GameVersion> thresholds = gameVersion.isNetEase()
+                ? NETEASE_PALETTE_THRESHOLDS
+                : STANDARD_PALETTE_THRESHOLDS;
+        Map.Entry<Integer, GameVersion> entry = thresholds.floorEntry(protocol);
+        if (entry == null) {
+            throw new IllegalArgumentException("Tried to get BlockPalette for unsupported protocol version: " + protocol
+                    + (gameVersion.isNetEase() ? " (NetEase)" : ""));
+        }
+        return paletteCache.computeIfAbsent(entry.getValue(), BlockPalette::new);
+    }
+
+    @Deprecated
+    public static int getOrCreateRuntimeId(int protocol, int id, int meta) {
+        return getOrCreateRuntimeId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), id, meta);
+    }
+
+    public static int getOrCreateRuntimeId(GameVersion gameVersion, int id, int meta) {
+        int protocol = gameVersion.getProtocol();
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            BlockPalette palette = getPaletteByProtocol(gameVersion);
+            if (shouldUseHashedBlockNetworkIds(gameVersion)) {
+                return palette.getHashId(id, meta);
+            }
+            return palette.getRuntimeId(id, meta);
+        }
+
+        if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
+        int legacyId = protocol >= 388 ? ((id << 6) | meta) : ((id << 4) | meta);
+        int runtimeId;
+        switch (protocol) {
+            // Versions before this doesn't use runtime IDs
+            case 223:
+            case 224:
+                runtimeId = legacyToRuntimeId223.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId223.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 261:
+                runtimeId = legacyToRuntimeId261.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId261.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 274:
+                runtimeId = legacyToRuntimeId274.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId274.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 281:
+            case 282:
+                runtimeId = legacyToRuntimeId282.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId282.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 291:
+                runtimeId = legacyToRuntimeId291.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId291.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 313:
+                runtimeId = legacyToRuntimeId313.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId313.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 332:
+                runtimeId = legacyToRuntimeId332.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId332.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 340:
+                runtimeId = legacyToRuntimeId340.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId340.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 354:
+                runtimeId = legacyToRuntimeId354.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId354.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 361:
+                runtimeId = legacyToRuntimeId361.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId361.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 388:
+                runtimeId = legacyToRuntimeId388.get(legacyId);
+                if (runtimeId == -1) {
+                    runtimeId = legacyToRuntimeId388.get(id << 6);
+                    if (runtimeId == -1) runtimeId = legacyToRuntimeId388.get(BlockID.INFO_UPDATE << 6);
+                }
+                return runtimeId;
+            case 389:
+            case 390:
+                runtimeId = legacyToRuntimeId389.get(legacyId);
+                if (runtimeId == -1) {
+                    runtimeId = legacyToRuntimeId389.get(id << 6);
+                    if (runtimeId == -1) runtimeId = legacyToRuntimeId389.get(BlockID.INFO_UPDATE << 6);
+                }
+                return runtimeId;
+            case 407:
+            case 408:
+            case 409:
+            case 410:
+            case 411:
+                runtimeId = legacyToRuntimeId407.get(legacyId);
+                if (runtimeId == -1) {
+                    runtimeId = legacyToRuntimeId407.get(id << 6);
+                    if (runtimeId == -1) runtimeId = legacyToRuntimeId407.get(BlockID.INFO_UPDATE << 6);
+                }
+                return runtimeId;
+            default:
+                throw new IllegalArgumentException("Tried to get legacyToRuntimeIdMap for unsupported protocol version: " + protocol);
+        }
+    }
+
+    public static byte[] getCompiledTable(int protocol) {
+        switch (protocol) {
+            // Versions before this doesn't send compiled table in StartGamePacket
+            case 281:
+            case 282:
+                return compiledTable282;
+            case 291:
+                return compiledTable291;
+            case 313:
+                return compiledTable313;
+            case 332:
+                return compiledTable332;
+            case 340:
+                return compiledTable340;
+            case 354:
+                return compiledTable354;
+            case 361:
+                return compiledTable361;
+            case 388:
+                return compiledTable388;
+            case 389:
+            case 390:
+                return compiledTable389;
+            case 407:
+            case 408:
+            case 409:
+            case 410:
+            case 411:
+                return compiledTable407;
+            default: // Unused since 1.16.100 (419)
+                throw new IllegalArgumentException("Tried to get compiled block runtime id table for unsupported protocol version: " + protocol);
+        }
+    }
+
+    @Deprecated
+    public static int getOrCreateRuntimeId(int protocol, int legacyId) throws NoSuchElementException {
+        return getOrCreateRuntimeId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), legacyId);
+    }
+
+    public static int getOrCreateRuntimeId(GameVersion gameVersion, int legacyId) throws NoSuchElementException {
+        int protocol = gameVersion.getProtocol();
+        if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
+        int runtimeId;
+        switch (protocol) {
+            case 223:
+            case 224:
+                runtimeId = legacyToRuntimeId223.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId223.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 261:
+                runtimeId = legacyToRuntimeId261.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId261.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 274:
+                runtimeId = legacyToRuntimeId274.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId274.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 281:
+            case 282:
+                runtimeId = legacyToRuntimeId282.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId282.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 291:
+                runtimeId = legacyToRuntimeId291.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId291.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 313:
+                runtimeId = legacyToRuntimeId313.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId313.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 332:
+                runtimeId = legacyToRuntimeId332.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId332.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 340:
+                runtimeId = legacyToRuntimeId340.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId340.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 354:
+                runtimeId = legacyToRuntimeId354.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId354.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            case 361:
+                runtimeId = legacyToRuntimeId361.get(legacyId);
+                if (runtimeId == -1) runtimeId = legacyToRuntimeId361.get(BlockID.INFO_UPDATE << 4);
+                return runtimeId;
+            default: // 388+
+                return getOrCreateRuntimeId(gameVersion, legacyId >> Block.DATA_BITS, legacyId & Block.DATA_MASK);
+        }
+    }
+
+    @Deprecated
+    public static int getLegacyFullId(int protocolId, int runtimeId) {
+        return getLegacyFullId(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode), runtimeId);
+    }
+
+    public static int getLegacyFullId(GameVersion protocolId, int runtimeId) {
+        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
+        if (blockPalette != null) {
+            return blockPalette.getLegacyFullId(runtimeId);
+        }
+        throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
+    }
+
+    /**
+     * 从哈希ID获取完整的旧方块ID
+     * Get full legacy block ID from hash ID
+     * <p>
+     * 用于从新版本协议(1.19.80+)使用的哈希ID转换回内部使用的旧方块ID
+     * Used to convert hash ID used in newer protocols (1.19.80+) back to internal legacy block ID
+     *
+     * @param protocolId 游戏版本 / game version
+     * @param hashId 方块状态的哈希ID / hash ID of the block state
+     * @return 完整的旧方块ID / full legacy block ID
+     * @throws IllegalArgumentException 如果协议版本不支持 / if protocol version is not supported
+     */
+    public static int getLegacyFullIdFromHashId(GameVersion protocolId, int hashId) {
+        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
+        if (blockPalette != null) {
+            return blockPalette.getLegacyFullIdFromHashId(hashId);
+        }
+        throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
+    }
+
+    @Deprecated
+    public static int getLegacyFullId(int protocolId, CompoundTag blockState) {
+        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
+        if (blockPalette != null) {
+            return blockPalette.getLegacyFullId(blockState);
+        }
+        throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
+    }
+
+    public static int getLegacyFullId(GameVersion protocolId, CompoundTag blockState) {
+        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
+        if (blockPalette != null) {
+            return blockPalette.getLegacyFullId(blockState);
+        }
+        throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
+    }
+
+    /**
+     * 获取或创建方块的哈希ID
+     * Get or create hash ID of a block
+     * <p>
+     * 如果启用了哈希方块网络ID功能，则返回方块的哈希ID，否则返回-1
+     * Returns the block's hash ID if hashed block network IDs are enabled, otherwise returns -1
+     *
+     * @param gameVersion 游戏版本 / game version
+     * @param id 方块ID / block ID
+     * @param meta 方块元数据值 / block metadata value
+     * @return 方块的哈希ID，如果功能未启用则返回-1 / hash ID of the block, returns -1 if feature is not enabled
+     */
+    public static int getOrCreateHashId(GameVersion gameVersion, int id, int meta) {
+        if (shouldUseHashedBlockNetworkIds(gameVersion)) {
+            return getPaletteByProtocol(gameVersion).getHashId(id, meta);
+        }
+        return -1;
+    }
+
+    /**
+     * 从旧方块ID获取或创建哈希ID
+     * Get or create hash ID from legacy block ID
+     * <p>
+     * 如果启用了哈希方块网络ID功能，则返回方块的哈希ID，否则返回-1
+     * Returns the block's hash ID if hashed block network IDs are enabled, otherwise returns -1
+     *
+     * @param gameVersion 游戏版本 / game version
+     * @param legacyId 完整的旧方块ID (blockId << Block.DATA_BITS | meta) / full legacy block ID
+     * @return 方块的哈希ID，如果功能未启用则返回-1 / hash ID of the block, returns -1 if feature is not enabled
+     * @throws NoSuchElementException 如果找不到方块 / if block is not found
+     */
+    public static int getOrCreateHashId(GameVersion gameVersion, int legacyId) throws NoSuchElementException {
+        if (shouldUseHashedBlockNetworkIds(gameVersion)) {
+            return getPaletteByProtocol(gameVersion).getHashId(legacyId >> Block.DATA_BITS, legacyId & Block.DATA_MASK);
+        }
+        return -1;
+    }
+
+    /**
+     * 检查指定游戏版本是否应该使用哈希方块网络ID
+     * Check if hashed block network IDs should be used for the specified game version
+     * <p>
+     * 当启用了哈希网络ID功能且游戏版本 >= 1.19.80时返回true
+     * Returns true when hashed network IDs are enabled and game version >= 1.19.80
+     * <p>
+     * 哈希网络ID是基于方块状态NBT的哈希值，用于支持自定义方块和更灵活的方块状态传输
+     * Hashed network IDs are based on block state NBT hash and used to support custom blocks and more flexible block state transmission
+     *
+     * @param gameVersion 游戏版本 / game version
+     * @return 是否应该使用哈希方块网络ID / whether hashed block network IDs should be used
+     */
+    public static boolean shouldUseHashedBlockNetworkIds(GameVersion gameVersion) {
+        return useHashedBlockNetworkIds && gameVersion.getProtocol() >= ProtocolInfo.v1_19_80;
+    }
+
+    /**
+     * 获取全局哈希方块网络ID功能是否启用
+     * Get whether global hashed block network IDs feature is enabled
+     *
+     * @return 是否启用哈希方块网络ID / whether hashed block network IDs are enabled
+     */
+    public static boolean useHashedBlockNetworkIds() {
+        return useHashedBlockNetworkIds;
+    }
+
+    /**
+     * 设置全局哈希方块网络ID功能的启用状态
+     * Set the enabled state of global hashed block network IDs feature
+     * <p>
+     * 此功能主要用于支持自定义方块，启用后会使用基于NBT哈希的网络ID代替传统的运行时ID
+     * This feature is mainly used to support custom blocks, when enabled it uses NBT hash-based network IDs instead of traditional runtime IDs
+     *
+     * @param enabled 是否启用 / whether to enable
+     */
+    public static void setUseHashedBlockNetworkIds(boolean enabled) {
+        useHashedBlockNetworkIds = enabled;
+    }
+
+    public static int getOrCreateRuntimeId(int legacyId) throws NoSuchElementException {
+        Server.mvw("GlobalBlockPalette#getOrCreateRuntimeId(int)");
+        return getOrCreateRuntimeId(GameVersion.getLastVersion(), legacyId >> 4, legacyId & 0xf);
+    }
+
+    public static int getLegacyFullId(int runtimeId) {
+        Server.mvw("GlobalBlockPalette#getLegacyFullId(int)");
+        return getLegacyFullId(GameVersion.getLastVersion(), runtimeId);
+    }
+
+    @SuppressWarnings("unused")
+    private static class TableEntry {
+        private int id;
+        private int data;
+        private String name;
+    }
+
+    @SuppressWarnings("unused")
+    private static class TableEntryOld {
+        private int id;
+        private int data;
+        private int runtimeID;
+        private String name;
+    }
+}

@@ -1,0 +1,18 @@
+name: CustomPerms
+main: com.server.customperms.CustomPermsPlugin
+version: "1.0.0"
+api: ["1.0.0"]
+author: ServerTeam
+description: Custom permissions system - LuckPerms alternative
+commands:
+  perms:
+    description: Manage permissions
+    usage: "/perms <group|user|reload>"
+    permission: customperms.admin
+permissions:
+  customperms.admin:
+    description: Full permissions management
+    default: op
+  customperms.user:
+    description: View own permissions
+    default: true
